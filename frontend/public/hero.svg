@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" width="800" height="520" role="img" aria-label="Route de campagne avec une petite voiture">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBF8F3"/>
+      <stop offset="1" stop-color="#F5EFE6"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="520" rx="32" fill="url(#sky)"/>
+
+  <!-- sun -->
+  <circle cx="620" cy="120" r="54" fill="#C8A97E" opacity="0.9"/>
+
+  <!-- distant hills -->
+  <path d="M0 330 C120 260 220 280 330 300 C440 320 520 240 640 270 C720 290 760 300 800 290 L800 520 L0 520 Z" fill="#D9C2A7"/>
+  <path d="M0 370 C100 330 200 350 300 360 C420 372 520 320 650 345 C730 360 770 370 800 365 L800 520 L0 520 Z" fill="#B8926F"/>
+
+  <!-- road -->
+  <path d="M0 520 C200 470 420 460 800 440 L800 520 Z" fill="#5C3D2E"/>
+  <path d="M60 508 C240 470 440 462 760 448" stroke="#FBF8F3" stroke-width="4" stroke-dasharray="28 22" fill="none" opacity="0.9"/>
+
+  <!-- trees -->
+  <g fill="#4A3023">
+    <ellipse cx="110" cy="345" rx="26" ry="34"/><rect x="106" y="360" width="8" height="40"/>
+    <ellipse cx="700" cy="330" rx="22" ry="30"/><rect x="696" y="345" width="8" height="36"/>
+  </g>
+
+  <!-- car -->
+  <g transform="translate(430 395)">
+    <rect x="-70" y="10" width="140" height="44" rx="12" fill="#5C3D2E"/>
+    <path d="M-40 10 L-26 -18 H28 L46 10 Z" fill="#5C3D2E"/>
+    <path d="M-30 6 L-19 -12 H-2 V6 Z M6 6 V-12 H24 L36 6 Z" fill="#F5EFE6"/>
+    <circle cx="-40" cy="56" r="14" fill="#2B1D14"/><circle cx="-40" cy="56" r="6" fill="#F5EFE6"/>
+    <circle cx="40" cy="56" r="14" fill="#2B1D14"/><circle cx="40" cy="56" r="6" fill="#F5EFE6"/>
+    <rect x="62" y="26" width="10" height="8" rx="2" fill="#C8A97E"/>
+    <!-- learner "A" plate -->
+    <rect x="-16" y="22" width="32" height="24" rx="4" fill="#F5EFE6"/>
+    <text x="0" y="40" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" font-weight="700" fill="#5C3D2E">A</text>
+  </g>
+</svg>

@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import Logo from '@/components/Logo';
 
 interface Slot {
   id: number;
   date: string;
   start_time: string;
   end_time: string;
-  status: string;
+  status: 'AVAILABLE' | 'BOOKED' | 'CANCELLED';
   meeting_point_name: string;
-  student_name: string;
+  student_name: string | null;
 }
+
+const statusStyle: Record<Slot['status'], { label: string; cls: string }> = {
+  BOOKED: { label: 'Réservé', cls: 'bg-brown-700 text-cream-50' },
+  AVAILABLE: { label: 'Disponible', cls: 'bg-cream-200 text-brown-800' },
+  CANCELLED: { label: 'Annulé', cls: 'bg-red-100 text-red-700' },
+};
 
 export default function InstructorPlanning() {
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -24,114 +32,69 @@ export default function InstructorPlanning() {
       router.push('/login');
       return;
     }
-
-    const fetchSlots = async () => {
-      try {
-        const response = await api.get('/slots/');
-        setSlots(response.data);
-      } catch (error) {
-        console.error('Error fetching slots:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchSlots();
+    api.get('/slots/')
+      .then((r) => setSlots(r.data.results ?? r.data))
+      .catch((e) => console.error(e))
+      .finally(() => setIsLoading(false));
   }, [isAuthenticated, user, router]);
 
-  if (isLoading) {
-    return <div className="flex justify-center items-center h-screen">Chargement...</div>;
-  }
+  if (isLoading) return <div className="flex justify-center items-center h-screen text-brown-500">Chargement…</div>;
+
+  const booked = slots.filter((s) => s.status === 'BOOKED').length;
+  const available = slots.filter((s) => s.status === 'AVAILABLE').length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="container py-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold">Planning de la monitrice</h1>
-            <button
-              onClick={() => {
-                logout();
-                router.push('/login');
-              }}
-              className="btn-secondary"
-            >
-              Déconnexion
-            </button>
-          </div>
+    <>
+      <Head><title>Planning — Kaho</title></Head>
+      <header className="bg-white border-b border-cream-200">
+        <div className="container flex items-center justify-between py-3">
+          <Logo />
+          <button onClick={() => { logout(); router.push('/login'); }} className="btn-secondary">Déconnexion</button>
         </div>
       </header>
 
       <main className="container py-8">
-        <div className="mb-6 flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Créneaux</h2>
-          <button className="btn-primary">+ Ajouter un créneau</button>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl">Planning</h1>
+          <button className="btn-primary">+ Créneau</button>
         </div>
 
-        <div className="card">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-4">Date</th>
-                  <th className="text-left py-3 px-4">Heure</th>
-                  <th className="text-left py-3 px-4">Lieu</th>
-                  <th className="text-left py-3 px-4">Élève</th>
-                  <th className="text-left py-3 px-4">Statut</th>
-                  <th className="text-left py-3 px-4">Actions</th>
+        <div className="grid sm:grid-cols-3 gap-4 mb-8">
+          <div className="card py-4"><p className="text-sm text-brown-800/70">Réservés</p><p className="text-3xl font-display">{booked}</p></div>
+          <div className="card py-4"><p className="text-sm text-brown-800/70">Disponibles</p><p className="text-3xl font-display">{available}</p></div>
+          <button className="card py-4 text-left hover:border-brown-300 transition-colors">
+            <p className="text-sm text-brown-800/70">Carnet de bord</p>
+            <p className="font-medium text-brown-700">Ajouter km / plein →</p>
+          </button>
+        </div>
+
+        <div className="card p-0 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-cream-100 text-brown-800/70">
+              <tr>
+                <th className="text-left py-3 px-4 font-medium">Date</th>
+                <th className="text-left py-3 px-4 font-medium">Heure</th>
+                <th className="text-left py-3 px-4 font-medium">Lieu</th>
+                <th className="text-left py-3 px-4 font-medium">Élève</th>
+                <th className="text-left py-3 px-4 font-medium">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {slots.length === 0 ? (
+                <tr><td colSpan={5} className="text-center py-10 text-brown-800/60">Aucun créneau pour le moment</td></tr>
+              ) : slots.map((s) => (
+                <tr key={s.id} className="border-t border-cream-200 hover:bg-cream-50">
+                  <td className="py-3 px-4">{s.date}</td>
+                  <td className="py-3 px-4">{s.start_time.slice(0, 5)} – {s.end_time.slice(0, 5)}</td>
+                  <td className="py-3 px-4">{s.meeting_point_name}</td>
+                  <td className="py-3 px-4">{s.student_name || '—'}</td>
+                  <td className="py-3 px-4"><span className={`badge ${statusStyle[s.status].cls}`}>{statusStyle[s.status].label}</span></td>
                 </tr>
-              </thead>
-              <tbody>
-                {slots.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8 text-gray-500">
-                      Aucun créneau pour le moment
-                    </td>
-                  </tr>
-                ) : (
-                  slots.map((slot) => (
-                    <tr key={slot.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4">{slot.date}</td>
-                      <td className="py-3 px-4">{slot.start_time} - {slot.end_time}</td>
-                      <td className="py-3 px-4">{slot.meeting_point_name}</td>
-                      <td className="py-3 px-4">{slot.student_name || '-'}</td>
-                      <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded text-sm font-medium ${
-                          slot.status === 'BOOKED'
-                            ? 'bg-green-100 text-green-700'
-                            : slot.status === 'AVAILABLE'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-red-100 text-red-700'
-                        }`}>
-                          {slot.status === 'BOOKED' ? '✅ Réservé' : slot.status === 'AVAILABLE' ? '⏳ Disponible' : '❌ Annulé'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <button className="text-blue-600 hover:text-blue-700">Éditer</button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6 mt-8">
-          <div className="card">
-            <h3 className="text-xl font-bold mb-4">📊 Statistiques du jour</h3>
-            <div className="space-y-2">
-              <p>Créneaux réservés: {slots.filter(s => s.status === 'BOOKED').length}</p>
-              <p>Créneaux disponibles: {slots.filter(s => s.status === 'AVAILABLE').length}</p>
-            </div>
-          </div>
-
-          <div className="card">
-            <h3 className="text-xl font-bold mb-4">🚗 Carnet de bord</h3>
-            <button className="btn-primary w-full">Ajouter une entrée kilométrique</button>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </main>
-    </div>
+    </>
   );
 }

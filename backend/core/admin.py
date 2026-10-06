@@ -50,7 +50,7 @@ class SlotAdmin(admin.ModelAdmin):
 class LessonAdmin(admin.ModelAdmin):
     list_display = ('get_student_name', 'slot', 'attended', 'weather_conditions')
     list_filter = ('attended', 'created_at')
-    search_fields = ('student__user__email')
+    search_fields = ('student__user__email',)
     readonly_fields = ('created_at', 'updated_at')
 
     def get_student_name(self, obj):
@@ -62,7 +62,7 @@ class LessonAdmin(admin.ModelAdmin):
 class PackageAdmin(admin.ModelAdmin):
     list_display = ('get_student_name', 'hours_purchased', 'amount_paid', 'status')
     list_filter = ('status', 'created_at')
-    search_fields = ('student__user__email')
+    search_fields = ('student__user__email',)
     readonly_fields = ('created_at', 'updated_at')
 
     def get_student_name(self, obj):
@@ -74,15 +74,19 @@ class PackageAdmin(admin.ModelAdmin):
 class DocumentAdmin(admin.ModelAdmin):
     list_display = ('get_student_name', 'document_type', 'verified', 'uploaded_at')
     list_filter = ('document_type', 'verified', 'uploaded_at')
-    search_fields = ('student__user__email')
+    search_fields = ('student__user__email',)
     readonly_fields = ('uploaded_at',)
+
+    def get_student_name(self, obj):
+        return obj.student.user.get_full_name()
+    get_student_name.short_description = 'Étudiant'
 
 
 @admin.register(VehicleLog)
 class VehicleLogAdmin(admin.ModelAdmin):
     list_display = ('get_instructor_name', 'date', 'kilometers', 'fuel_cost', 'maintenance_alert')
     list_filter = ('date', 'instructor')
-    search_fields = ('instructor__email')
+    search_fields = ('instructor__email',)
     readonly_fields = ('created_at', 'updated_at')
 
     def get_instructor_name(self, obj):

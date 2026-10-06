@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
+import Head from 'next/head';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import Link from 'next/link';
+import Logo from '@/components/Logo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -16,91 +18,62 @@ export default function Login() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-
     try {
-      // Note: This uses password login. For Magic Links, implement a separate endpoint
-      const response = await api.post('/auth/token/', {
-        username: email,
-        password: password,
-      });
-
-      const { access, refresh } = response.data;
-      setToken(access, refresh);
-
-      // Fetch user info
-      const userResponse = await api.get('/users/me/');
-      setUser(userResponse.data);
-
-      // Redirect based on role
-      if (userResponse.data.role === 'INSTRUCTOR') {
-        router.push('/instructor/planning');
-      } else {
-        router.push('/student/dashboard');
-      }
+      const { data } = await api.post('/auth/token/', { username: email, password });
+      setToken(data.access, data.refresh);
+      const me = await api.get('/users/me/');
+      setUser(me.data);
+      router.push(me.data.role === 'INSTRUCTOR' ? '/instructor/planning' : '/student/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Erreur de connexion');
+      setError(err.response?.data?.detail || 'Email ou mot de passe incorrect');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="text-3xl font-bold text-center text-gray-900">Kaho</h2>
-          <h3 className="mt-6 text-center text-gray-600">Connectez-vous à votre compte</h3>
+    <>
+      <Head><title>Connexion — Kaho</title></Head>
+      <div className="min-h-screen grid md:grid-cols-2">
+        <div className="hidden md:flex flex-col justify-between bg-brown-700 text-cream-50 p-10">
+          <img src="/logo.svg" alt="Kaho" className="h-9 w-auto brightness-0 invert" />
+          <div>
+            <h2 className="text-3xl mb-3">Bon retour.</h2>
+            <p className="text-cream-200">Vos prochaines leçons et votre livret vous attendent.</p>
+          </div>
+          <img src="/hero.svg" alt="" className="w-full rounded-2xl opacity-90" />
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+        <div className="flex items-center justify-center p-6">
+          <form onSubmit={handleLogin} className="w-full max-w-sm space-y-5">
+            <div className="md:hidden mb-6"><Logo /></div>
+            <h1 className="text-3xl">Connexion</h1>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-field mt-1"
-              placeholder="votre@email.com"
-            />
-          </div>
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</div>
+            )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Mot de passe</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input-field mt-1"
-              placeholder="••••••••"
-            />
-          </div>
+            <label className="block">
+              <span className="text-sm font-medium text-brown-800">Email</span>
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input-field mt-1" placeholder="vous@exemple.fr" />
+            </label>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full btn-primary disabled:opacity-50"
-          >
-            {isLoading ? 'Connexion en cours...' : 'Se connecter'}
-          </button>
-        </form>
+            <label className="block">
+              <span className="text-sm font-medium text-brown-800">Mot de passe</span>
+              <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="input-field mt-1" placeholder="••••••••" />
+            </label>
 
-        <div className="text-center">
-          <p className="text-gray-600">
-            Pas encore de compte?{' '}
-            <Link href="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
-              S'inscrire
-            </Link>
-          </p>
+            <button type="submit" disabled={isLoading} className="btn-primary w-full disabled:opacity-60">
+              {isLoading ? 'Connexion…' : 'Se connecter'}
+            </button>
+
+            <p className="text-center text-sm text-brown-800/70">
+              Pas encore de compte ?{' '}
+              <Link href="/signup" className="text-brown-700 font-medium hover:underline">S’inscrire</Link>
+            </p>
+          </form>
         </div>
       </div>
-    </div>
+    </>
   );
 }
