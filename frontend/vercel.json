@@ -5,8 +5,7 @@
   "framework": "nextjs",
   "env": {
     "NEXT_PUBLIC_API_URL": {
-      "description": "Backend API URL",
-      "value": "https://kaho-api.railway.app/api"
+      "default": "http://localhost:8000/api"
     }
   }
 }
