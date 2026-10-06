@@ -18,6 +18,10 @@ class UserViewSet(viewsets.ModelViewSet):
             return User.objects.filter(role='STUDENT')
         return User.objects.filter(id=self.request.user.id)
 
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        return Response(self.get_serializer(request.user).data)
+
 
 class StudentProfileViewSet(viewsets.ModelViewSet):
     queryset = StudentProfile.objects.all()

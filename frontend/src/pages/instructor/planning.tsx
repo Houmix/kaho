@@ -16,7 +16,7 @@ interface Slot {
 export default function InstructorPlanning() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -50,7 +50,10 @@ export default function InstructorPlanning() {
           <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold">Planning de la monitrice</h1>
             <button
-              onClick={() => router.push('/logout')}
+              onClick={() => {
+                logout();
+                router.push('/login');
+              }}
               className="btn-secondary"
             >
               Déconnexion

@@ -114,10 +114,12 @@ class Lesson(models.Model):
         return f"Leçon {self.student.user.get_full_name()} - {self.slot.date}"
 
     def save(self, *args, **kwargs):
-        if self.attended and self.slot.student:
-            self.slot.student.used_hours += self.slot.duration_hours
-            self.slot.student.save()
+        # Décompte des heures uniquement à la création, pas à chaque modification du bilan
+        is_new = self._state.adding
         super().save(*args, **kwargs)
+        if is_new and self.attended:
+            self.student.used_hours += self.slot.duration_hours
+            self.student.save(update_fields=['used_hours'])
 
 
 class Package(models.Model):
@@ -142,11 +144,14 @@ class Package(models.Model):
         return f"{self.student.user.get_full_name()} - {self.hours_purchased}h - {self.get_status_display()}"
 
     def save(self, *args, **kwargs):
-        if self.status == 'COMPLETED' and not self._state.adding:
-            if self.student.purchased_hours < self.hours_purchased:
-                self.student.purchased_hours += self.hours_purchased
-                self.student.save()
+        # Crédite les heures une seule fois, au passage en COMPLETED
+        was_completed = False
+        if not self._state.adding:
+            was_completed = Package.objects.filter(pk=self.pk, status='COMPLETED').exists()
         super().save(*args, **kwargs)
+        if self.status == 'COMPLETED' and not was_completed:
+            self.student.purchased_hours += self.hours_purchased
+            self.student.save(update_fields=['purchased_hours'])
 
 
 class Document(models.Model):

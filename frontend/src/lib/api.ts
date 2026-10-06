@@ -55,7 +55,7 @@ api.interceptors.response.use(
     }
 
     // Handle offline - Queue request for later
-    if (!navigator.onLine && originalRequest?.method !== 'GET') {
+    if (!navigator.onLine && originalRequest && originalRequest.method !== 'GET') {
       await addToSyncQueue({
         method: originalRequest.method || 'GET',
         url: originalRequest.url || '',

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/router';
@@ -6,14 +7,12 @@ export default function Home() {
   const { isAuthenticated, user } = useAuth();
   const router = useRouter();
 
-  if (isAuthenticated) {
-    if (user?.role === 'INSTRUCTOR') {
-      router.push('/instructor/planning');
-    } else {
-      router.push('/student/dashboard');
-    }
-    return null;
-  }
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    router.push(user?.role === 'INSTRUCTOR' ? '/instructor/planning' : '/student/dashboard');
+  }, [isAuthenticated, user, router]);
+
+  if (isAuthenticated) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-500 to-blue-600">

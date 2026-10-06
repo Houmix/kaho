@@ -16,7 +16,7 @@ interface StudentProfile {
 export default function StudentDashboard() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, logout } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -57,7 +57,8 @@ export default function StudentDashboard() {
             <h1 className="text-3xl font-bold">Bienvenue, {user?.first_name}!</h1>
             <button
               onClick={() => {
-                router.push('/logout');
+                logout();
+                router.push('/login');
               }}
               className="btn-secondary"
             >
