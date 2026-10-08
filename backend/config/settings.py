@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'django_otp.plugins.otp_totp',
     'storages',
     'core',
+    'lms',
 ]
 
 MIDDLEWARE = [
@@ -172,6 +173,20 @@ SIMPLE_JWT = {
 
 # Frontend (liens dans les emails)
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+
+# Identité de l'école sur les factures
+COMPANY_NAME = config('COMPANY_NAME', default='Kaho Auto-École')
+COMPANY_ADDRESS = config('COMPANY_ADDRESS', default='')          # ex: "12 rue des Écoles, 75000 Paris"
+COMPANY_SIRET = config('COMPANY_SIRET', default='')
+COMPANY_VAT_NUMBER = config('COMPANY_VAT_NUMBER', default='')    # n° TVA intracommunautaire, vide si franchise
+COMPANY_EMAIL = config('COMPANY_EMAIL', default='contact@kaho-auto-ecole.fr')
+COMPANY_PHONE = config('COMPANY_PHONE', default='')
+INVOICE_PREFIX = config('INVOICE_PREFIX', default='KAHO')
+INVOICE_VAT_RATE = config('INVOICE_VAT_RATE', default=20.0, cast=float)  # 0 si franchise en base (art. 293 B)
+INVOICE_FOOTER = config('INVOICE_FOOTER', default='Paiement par virement, carte ou espèces. Pas d’escompte pour paiement anticipé. En cas de retard, pénalités au taux légal et indemnité forfaitaire de 40 € (art. L441-10 C. com.).')
+
+# Secret partagé avec le cron Vercel qui déclenche les rappels quotidiens (sans worker Celery)
+CRON_SECRET = config('CRON_SECRET', default='')
 
 # Réservation
 BOOKING_MIN_NOTICE_HOURS = config('BOOKING_MIN_NOTICE_HOURS', default=24, cast=int)

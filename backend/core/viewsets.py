@@ -10,7 +10,7 @@ from rest_framework.response import Response
 
 from .models import (
     User, StudentProfile, InstructorProfile, Availability, Unavailability, MeetingPoint, Slot,
-    Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Document, VehicleLog,
+    Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Invoice, Document, VehicleLog, log_activity,
 )
 from .permissions import IsInstructor, IsStaff, IsStudent, IsSupervisorOrAdmin
 from .scheduling import free_windows, is_window_free
@@ -18,7 +18,7 @@ from .serializers import (
     UserSerializer, StudentProfileSerializer, InstructorPublicSerializer, InstructorProfileSerializer,
     AvailabilitySerializer, UnavailabilitySerializer, FreeWindowSerializer, BookingSerializer,
     MeetingPointSerializer, SlotSerializer, CompetencySerializer, LessonSerializer, LessonRatingSerializer,
-    OfferSerializer, RecommendationInputSerializer, PackageSerializer, DocumentSerializer, VehicleLogSerializer,
+    OfferSerializer, RecommendationInputSerializer, PackageSerializer, InvoiceSerializer, DocumentSerializer, VehicleLogSerializer,
 )
 from .tasks import send_booking_confirmation
 
@@ -254,6 +254,8 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
                 date=d['date'], start_time=d['start_time'], end_time=d['end_time'], status='BOOKED',
             )
         send_booking_confirmation.delay(slot.id)
+        log_activity('BOOKING', f"{profile.user.get_full_name()} a réservé le {slot.date:%d/%m} {slot.start_time:%H:%M} avec {slot.instructor.get_full_name()}",
+                     actor=request.user, student=profile, instructor=slot.instructor, slot=slot)
         return Response(SlotSerializer(slot).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
@@ -272,6 +274,10 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
         slot.save(update_fields=['status', 'cancelled_at', 'updated_at'])
         if late:
             slot.debit_hours()
+        who = slot.student.user.get_full_name() if slot.student else 'Créneau'
+        log_activity('LATE_CANCELLATION' if late else 'CANCELLATION',
+                     f"{who} — leçon du {slot.date:%d/%m} {slot.start_time:%H:%M} annulée{' hors délai (heure débitée)' if late else ''} par {request.user.get_full_name()}",
+                     actor=request.user, student=slot.student, instructor=slot.instructor, slot=slot)
         return Response(SlotSerializer(slot).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsStaff])
@@ -283,6 +289,8 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
             Lesson.objects.create(slot=slot, student=slot.student, attended=False,
                                   instructor_notes=request.data.get('note', ''))
         slot.refresh_from_db()
+        log_activity('NO_SHOW', f"{slot.student.user.get_full_name()} absent le {slot.date:%d/%m} {slot.start_time:%H:%M} (heure débitée)",
+                     actor=request.user, student=slot.student, instructor=slot.instructor, slot=slot)
         return Response(SlotSerializer(slot).data)
 
     @action(detail=True, methods=['post'], permission_classes=[IsSupervisorOrAdmin])
@@ -294,6 +302,8 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Un justificatif est requis.'}, status=400)
         if not slot.refund_hours(note):
             return Response({'detail': "Aucune heure débitée à re-créditer sur ce créneau."}, status=400)
+        log_activity('REFUND', f"{slot.student.user.get_full_name()} — heure du {slot.date:%d/%m} re-créditée ({note})",
+                     actor=request.user, student=slot.student, instructor=slot.instructor, slot=slot)
         return Response(SlotSerializer(slot).data)
 
 
@@ -410,20 +420,71 @@ class PackageViewSet(viewsets.ModelViewSet):
         serializer.save(student=StudentProfile.objects.get(user=self.request.user))
 
 
-# ---------- Divers ----------
-
-class DocumentViewSet(viewsets.ModelViewSet):
-    serializer_class = DocumentSerializer
+class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
+    """Factures : l'élève voit les siennes, le staff toutes. /pdf/ renvoie le document."""
+    serializer_class = InvoiceSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in User.STAFF_ROLES:
-            return Document.objects.all()
-        return Document.objects.filter(student__user=user)
+        qs = Invoice.objects.select_related('student__user', 'package__offer')
+        return qs if user.role in User.STAFF_ROLES else qs.filter(student__user=user)
 
-    def perform_create(self, serializer):
-        serializer.save(student=StudentProfile.objects.get(user=self.request.user))
+    @action(detail=True, methods=['get'])
+    def pdf(self, request, pk=None):
+        from django.http import HttpResponse
+        from .invoices import build_invoice_pdf
+        invoice = self.get_object()
+        resp = HttpResponse(build_invoice_pdf(invoice), content_type='application/pdf')
+        resp['Content-Disposition'] = f'inline; filename="facture-{invoice.number}.pdf"'
+        return resp
+
+
+# ---------- Divers ----------
+
+class DocumentViewSet(viewsets.ModelViewSet):
+    """Dossier administratif de l'élève : dépôt (remplace la pièce existante), consultation, suppression si non validé."""
+    serializer_class = DocumentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    pagination_class = None
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = Document.objects.select_related('student__user', 'verified_by')
+        return qs if user.role in User.STAFF_ROLES else qs.filter(student__user=user)
+
+    def create(self, request, *args, **kwargs):
+        if request.user.role != 'STUDENT':
+            return Response({'detail': 'Seul un élève dépose ses pièces.'}, status=403)
+        s = self.get_serializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        student = StudentProfile.objects.get(user=request.user)
+        existing = Document.objects.filter(student=student, document_type=s.validated_data['document_type']).first()
+        if existing:
+            if existing.status == 'VERIFIED':
+                return Response({'detail': 'Cette pièce est déjà validée. Contactez votre école pour la remplacer.'}, status=400)
+            existing.file.delete(save=False)
+            existing.file = s.validated_data['file']
+            existing.status, existing.review_note, existing.reviewed_at, existing.verified_by = 'PENDING', '', None, None
+            existing.save()
+            doc = existing
+        else:
+            doc = s.save(student=student)
+        log_activity('DOCUMENT', f"{student.user.get_full_name()} a déposé : {doc.get_document_type_display()}", actor=request.user, student=student)
+        return Response(self.get_serializer(doc).data, status=status.HTTP_201_CREATED)
+
+    def perform_destroy(self, instance):
+        if self.request.user.role == 'STUDENT' and instance.status == 'VERIFIED':
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Une pièce validée ne peut pas être supprimée.')
+        instance.file.delete(save=False)
+        instance.delete()
+
+    @action(detail=False, methods=['get'], permission_classes=[IsStudent])
+    def my_dossier(self, request):
+        student = StudentProfile.objects.get(user=request.user)
+        return Response({'dossier': Document.dossier(student), 'documents': DocumentSerializer(student.documents.all(), many=True, context={'request': request}).data})
 
 
 class VehicleLogViewSet(viewsets.ModelViewSet):

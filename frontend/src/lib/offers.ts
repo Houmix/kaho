@@ -30,6 +30,8 @@ export interface Package {
   status: 'PENDING' | 'COMPLETED' | 'FAILED';
   status_display: string;
   expires_at: string | null;
+  invoice_id: number | null;
+  invoice_number: string | null;
   created_at: string;
 }
 

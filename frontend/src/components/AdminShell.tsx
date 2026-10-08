@@ -11,11 +11,12 @@ const NAV: { href: string; label: string; icon: string; soon?: boolean; external
   { href: '/admin', label: 'Tableau de bord', icon: '▦' },
   { href: '/admin/students', label: 'Apprenants', icon: '◉' },
   { href: '/admin/instructors', label: 'Formateurs', icon: '◆' },
-  { href: '/instructor/planning', label: 'Planning', icon: '▤' },
+  { href: '/admin/calendar', label: 'Planning', icon: '▤' },
   { href: '/admin/reviews', label: 'Avis', icon: '★' },
   { href: '/instructor/performance', label: 'Performance', icon: '◔' },
-  { href: '/admin/sales', label: 'Ventes & factures', icon: '◫', soon: true },
-  { href: '/admin/lms', label: 'Contenus LMS', icon: '▣', soon: true },
+  { href: '/admin/activity', label: 'Activité', icon: '≡' },
+  { href: '/admin/sales', label: 'Ventes & factures', icon: '◫' },
+  { href: '/admin/lms', label: 'Contenus LMS', icon: '▣' },
 ];
 
 function GlobalSearch() {
@@ -74,7 +75,7 @@ export default function AdminShell({ title, children, wide = false }: { title: s
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
   const adminUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '/admin/');
-  const isActive = (href: string) => router.pathname === href || (href !== '/admin' && router.pathname.startsWith(href));
+  const isActive = (href: string) => router.pathname === href || (href !== '/admin' && router.pathname.startsWith(href)) || (href === '/admin/calendar' && router.pathname === '/instructor/planning');
 
   const Nav = () => (
     <nav className="flex flex-col gap-0.5">
@@ -96,7 +97,7 @@ export default function AdminShell({ title, children, wide = false }: { title: s
 
   return (
     <>
-      <Head><title>{title} — Kaho</title></Head>
+      <Head><title>{`${title} — Kaho`}</title></Head>
       <div className="min-h-screen md:grid md:grid-cols-[240px_1fr]">
         <aside className="hidden md:flex flex-col bg-white border-r border-cream-200 p-4 sticky top-0 h-screen">
           <div className="mb-6 px-1"><Logo /></div>

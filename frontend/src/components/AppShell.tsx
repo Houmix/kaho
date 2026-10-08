@@ -9,7 +9,9 @@ import Logo from './Logo';
 const STUDENT_NAV = [
   { href: '/student/dashboard', label: 'Mon espace' },
   { href: '/student/reservation', label: 'Réserver' },
+  { href: '/code', label: 'Code' },
   { href: '/student/notebook', label: 'Livret' },
+  { href: '/student/documents', label: 'Documents' },
   { href: '/student/purchases', label: 'Offres' },
 ];
 const INSTRUCTOR_NAV = [
@@ -25,11 +27,11 @@ export default function AppShell({ title, children }: { title: string; children:
   }
   const nav = user?.role === 'STUDENT' ? STUDENT_NAV : INSTRUCTOR_NAV;
   const linkCls = (href: string) =>
-    `px-3 py-2 rounded-full text-sm font-medium ${router.pathname === href ? 'bg-brown-700 text-cream-50' : 'text-brown-800 hover:bg-cream-200'}`;
+    `px-3 py-2 rounded-full text-sm font-medium ${router.pathname === href || (href === '/code' && router.pathname.startsWith('/code')) ? 'bg-brown-700 text-cream-50' : 'text-brown-800 hover:bg-cream-200'}`;
 
   return (
     <>
-      <Head><title>{title} — Kaho</title></Head>
+      <Head><title>{`${title} — Kaho`}</title></Head>
       <header className="bg-white border-b border-cream-200">
         <div className="container flex items-center justify-between py-3 gap-3">
           <Logo />

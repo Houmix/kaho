@@ -6,8 +6,24 @@ from django.conf import settings as dj_settings
 
 from .models import (
     User, StudentProfile, InstructorProfile, InstructorApplication, Availability, Unavailability, MeetingPoint, Slot,
-    Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Document, VehicleLog,
+    Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Invoice, Document, VehicleLog,
 )
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    student_email = serializers.CharField(source='student.user.email', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    amount_ht = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    amount_vat = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    is_overdue = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Invoice
+        fields = ('id', 'number', 'package', 'student', 'student_name', 'student_email', 'label', 'quantity_hours',
+                  'amount_ht', 'amount_vat', 'amount_ttc', 'vat_rate', 'status', 'status_display', 'is_overdue',
+                  'issued_at', 'due_at', 'paid_at')
+        read_only_fields = fields
 
 
 def validate_upload(f):
@@ -73,6 +89,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     has_lms_access = serializers.BooleanField(read_only=True)
     referent_instructor_name = serializers.CharField(source='referent_instructor.get_full_name', read_only=True, default=None)
     competency_progress = serializers.SerializerMethodField()
+    dossier = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentProfile
@@ -81,7 +98,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             'remaining_hours', 'reserved_hours', 'bookable_hours',
             'lms_access', 'lms_access_until', 'has_lms_access',
             'referent_instructor', 'referent_instructor_name', 'emergency_contact', 'emergency_phone',
-            'license_type', 'ready_for_exam', 'competency_progress', 'created_at', 'updated_at',
+            'license_type', 'ready_for_exam', 'competency_progress', 'dossier', 'created_at', 'updated_at',
         )
         read_only_fields = (
             'id', 'created_at', 'updated_at', 'used_hours', 'purchased_hours', 'referent_instructor',
@@ -90,6 +107,9 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 
     def get_competency_progress(self, obj):
         return obj.competency_progress()
+
+    def get_dossier(self, obj):
+        return Document.dossier(obj)
 
 
 class InstructorPublicSerializer(serializers.ModelSerializer):
@@ -403,6 +423,8 @@ class PackageSerializer(serializers.ModelSerializer):
     offer_category = serializers.CharField(source='offer.category', read_only=True)
     includes_lms = serializers.BooleanField(source='offer.includes_lms', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    invoice_id = serializers.IntegerField(source='invoice.id', read_only=True, default=None)
+    invoice_number = serializers.CharField(source='invoice.number', read_only=True, default=None)
 
     def create(self, validated_data):
         offer = validated_data['offer']
@@ -414,7 +436,8 @@ class PackageSerializer(serializers.ModelSerializer):
         model = Package
         fields = (
             'id', 'student', 'student_name', 'offer', 'offer_name', 'offer_category', 'includes_lms',
-            'hours_purchased', 'amount_paid', 'status', 'status_display', 'paid_at', 'expires_at', 'note', 'created_at', 'updated_at',
+            'hours_purchased', 'amount_paid', 'status', 'status_display', 'paid_at', 'expires_at', 'note',
+            'invoice_id', 'invoice_number', 'created_at', 'updated_at',
         )
         read_only_fields = ('id', 'student', 'hours_purchased', 'amount_paid', 'status', 'paid_at', 'expires_at', 'note', 'created_at', 'updated_at')
 
@@ -423,12 +446,21 @@ class PackageSerializer(serializers.ModelSerializer):
 
 class DocumentSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
-    verified_by_name = serializers.CharField(source='verified_by.get_full_name', read_only=True, allow_null=True)
+    document_type_display = serializers.CharField(source='get_document_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    verified_by_name = serializers.CharField(source='verified_by.get_full_name', read_only=True, default=None)
+    file_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
-        fields = ('id', 'student', 'student_name', 'document_type', 'file', 'uploaded_at', 'verified', 'verified_by', 'verified_by_name')
-        read_only_fields = ('id', 'uploaded_at', 'verified_by')
+        fields = ('id', 'student', 'student_name', 'document_type', 'document_type_display', 'file', 'file_name',
+                  'uploaded_at', 'status', 'status_display', 'review_note', 'reviewed_at', 'verified_by', 'verified_by_name')
+        read_only_fields = ('id', 'student', 'uploaded_at', 'status', 'review_note', 'reviewed_at', 'verified_by')
+
+    validate_file = staticmethod(validate_upload)
+
+    def get_file_name(self, obj):
+        return obj.file.name.rsplit('/', 1)[-1] if obj.file else ''
 
 
 class VehicleLogSerializer(serializers.ModelSerializer):

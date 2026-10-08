@@ -43,6 +43,20 @@ class PasswordResetRequestView(APIView):
         return Response({'detail': 'Si un compte existe pour cet email, un lien de réinitialisation a été envoyé.'})
 
 
+class InternalRemindersView(APIView):
+    """Déclenché chaque matin par le cron Vercel (header X-Cron-Secret). Remplace Celery beat sans Redis."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        secret = settings.CRON_SECRET
+        if not secret or request.headers.get('X-Cron-Secret') != secret:
+            return Response({'detail': 'Non autorisé.'}, status=status.HTTP_403_FORBIDDEN)
+        from .tasks import send_lesson_reminders
+        sent = send_lesson_reminders()
+        return Response({'sent': sent})
+
+
 class PasswordResetConfirmView(APIView):
     permission_classes = [permissions.AllowAny]
 

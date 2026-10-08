@@ -147,11 +147,61 @@ def send_booking_confirmation(slot_id):
 
 
 @shared_task
-def send_lesson_reminders():
-    """Rappel email (+ SMS si configuré) la veille de chaque leçon. Lancé par Celery beat chaque matin."""
+def send_document_reviewed(document_id):
+    from .models import Document
+    try:
+        doc = Document.objects.select_related('student__user').get(pk=document_id)
+    except Document.DoesNotExist:
+        return
+    user = doc.student.user
+    if doc.status == 'VERIFIED':
+        dossier = Document.dossier(doc.student)
+        extra = "<p><strong>Votre dossier est maintenant complet.</strong></p>" if dossier['complete'] else f"<p>Il reste {dossier['missing'] + dossier['pending']} pièce(s) à fournir ou en attente de vérification.</p>"
+        _send_email(user.email, f"Pièce validée : {doc.get_document_type_display()} — Kaho",
+                    _layout('Pièce validée', f"<p>Bonjour {user.first_name},</p><p>Votre <strong>{doc.get_document_type_display().lower()}</strong> a été vérifiée et validée.</p>{extra}"))
+    elif doc.status == 'REJECTED':
+        _send_email(user.email, f"Pièce à redéposer : {doc.get_document_type_display()} — Kaho",
+                    _layout('Pièce refusée', f"""<p>Bonjour {user.first_name},</p>
+                    <p>Votre <strong>{doc.get_document_type_display().lower()}</strong> n'a pas pu être validée :</p>
+                    <p style="border-left:3px solid #C8A97E;padding-left:12px">{escape(doc.review_note)}</p>
+                    <p>Merci de déposer une nouvelle version depuis votre espace, rubrique Documents.</p>"""))
+
+
+@shared_task
+def send_booking_changed(slot_id, old_label):
     from .models import Slot
+    try:
+        slot = Slot.objects.select_related('student__user', 'instructor', 'meeting_point').get(pk=slot_id)
+    except Slot.DoesNotExist:
+        return
+    if not slot.student:
+        return
+    _send_email(
+        slot.student.user.email,
+        f"Votre leçon a été déplacée — {slot.date:%d/%m/%Y} à {slot.start_time:%H:%M}",
+        _layout('Changement de leçon', f"""
+        <p>Bonjour {slot.student.user.first_name},</p>
+        <p>Votre leçon initialement prévue <strong>{old_label}</strong> a été modifiée :</p>
+        <ul>
+          <li><strong>Nouvelle date :</strong> {_fr_date(slot.date)}</li>
+          <li><strong>Heure :</strong> {slot.start_time:%H:%M} – {slot.end_time:%H:%M}</li>
+          <li><strong>Moniteur :</strong> {slot.instructor.get_full_name()}</li>
+          <li><strong>Lieu :</strong> {slot.meeting_point.name} — {slot.meeting_point.address}</li>
+        </ul>
+        <p>En cas d'empêchement, annulez depuis votre espace ou contactez-nous.</p>"""),
+    )
+    _send_sms(slot.student.phone, f"Kaho : votre leçon est déplacée au {slot.date:%d/%m} à {slot.start_time:%H:%M} avec {slot.instructor.first_name}.")
+
+
+@shared_task
+def send_lesson_reminders():
+    """Rappel email (+ SMS si configuré) la veille de chaque leçon. Déclenché par Celery beat ou par le cron HTTP."""
+    from .models import Slot, log_activity
     tomorrow = timezone.localdate() + timedelta(days=1)
-    for slot in Slot.objects.filter(date=tomorrow, status='BOOKED', student__isnull=False).select_related('student__user', 'instructor', 'meeting_point'):
+    slots = Slot.objects.filter(date=tomorrow, status='BOOKED', student__isnull=False).select_related('student__user', 'instructor', 'meeting_point')
+    sent = 0
+    for slot in slots:
+        sent += 1
         user = slot.student.user
         _send_email(
             user.email,
@@ -168,6 +218,8 @@ def send_lesson_reminders():
             <p>Merci d'arriver 5 minutes avant l'heure.</p>"""),
         )
         _send_sms(slot.student.phone, f"Kaho : rappel de votre leçon demain à {slot.start_time:%H:%M} avec {slot.instructor.first_name}, RDV {slot.meeting_point.name}.")
+    log_activity('REMINDERS', f"Rappels envoyés pour le {tomorrow:%d/%m/%Y} : {sent} leçon(s)")
+    return sent
 
 
 @shared_task

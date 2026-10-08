@@ -6,6 +6,28 @@ from .models import (
 )
 
 
+from .models import ActivityLog, Invoice
+
+
+@admin.register(Invoice)
+class InvoiceAdmin(admin.ModelAdmin):
+    list_display = ('number', 'student', 'label', 'amount_ttc', 'status', 'issued_at', 'due_at', 'paid_at')
+    list_filter = ('status', 'issued_at')
+    search_fields = ('number', 'student__user__email', 'student__user__last_name')
+    readonly_fields = ('number', 'package', 'student', 'label', 'quantity_hours', 'amount_ttc', 'vat_rate', 'status', 'issued_at', 'due_at', 'paid_at', 'created_at')
+
+    def has_add_permission(self, request):
+        return False  # les factures sont émises automatiquement par les achats
+
+
+@admin.register(ActivityLog)
+class ActivityLogAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'kind', 'message', 'actor')
+    list_filter = ('kind',)
+    search_fields = ('message',)
+    readonly_fields = ('created_at',)
+
+
 @admin.register(InstructorApplication)
 class InstructorApplicationAdmin(admin.ModelAdmin):
     list_display = ('last_name', 'first_name', 'email', 'phone', 'gearbox', 'status', 'created_at', 'reviewed_by')
@@ -186,10 +208,15 @@ class PackageAdmin(admin.ModelAdmin):
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('get_student_name', 'document_type', 'verified', 'uploaded_at')
-    list_filter = ('document_type', 'verified', 'uploaded_at')
+    list_display = ('get_student_name', 'document_type', 'status', 'uploaded_at', 'verified_by')
+    list_filter = ('document_type', 'status', 'uploaded_at')
+    list_editable = ('status',)
     search_fields = ('student__user__email',)
-    readonly_fields = ('uploaded_at',)
+    readonly_fields = ('uploaded_at', 'reviewed_at', 'verified_by')
+
+    def get_student_name(self, obj):
+        return obj.student.user.get_full_name()
+    get_student_name.short_description = 'Élève'
 
     def get_student_name(self, obj):
         return obj.student.user.get_full_name()

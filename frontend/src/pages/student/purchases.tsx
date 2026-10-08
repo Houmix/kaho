@@ -4,6 +4,7 @@ import api from '@/lib/api';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
 import OfferCard from '@/components/OfferCard';
+import PdfLink from '@/components/PdfLink';
 import { CATEGORY_LABELS, Offer, OfferCategory, Package, formatPrice } from '@/lib/offers';
 import { StudentProfile, frDate } from '@/lib/types';
 
@@ -113,6 +114,7 @@ export default function Purchases() {
                 <th className="text-left py-3 px-4 font-medium">Montant</th>
                 <th className="text-left py-3 px-4 font-medium">Validité</th>
                 <th className="text-left py-3 px-4 font-medium">Statut</th>
+                <th className="text-left py-3 px-4 font-medium">Facture</th>
               </tr>
             </thead>
             <tbody>
@@ -124,6 +126,7 @@ export default function Purchases() {
                   <td className="py-3 px-4">{formatPrice(p.amount_paid)}</td>
                   <td className="py-3 px-4">{p.expires_at ? frDate(p.expires_at, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
                   <td className="py-3 px-4"><span className={`badge ${statusCls[p.status]}`}>{p.status_display}</span></td>
+                  <td className="py-3 px-4">{p.invoice_id && p.invoice_number ? <PdfLink invoiceId={p.invoice_id} number={p.invoice_number} /> : <span className="text-brown-800/40">—</span>}</td>
                 </tr>
               ))}
             </tbody>

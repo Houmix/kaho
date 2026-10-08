@@ -5,6 +5,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import AdminShell from '@/components/AdminShell';
 import { Overview } from '@/lib/admin';
 import { formatPrice } from '@/lib/offers';
+import { ActivityList } from './activity';
 
 function Kpi({ label, value, sub, href, tone }: { label: string; value: string; sub?: string; href?: string; tone?: 'warn' }) {
   const inner = (
@@ -21,7 +22,7 @@ const QUICK = [
   { href: '/admin/students?new=1', label: 'Créer un élève', hint: 'Compte + offre + heures' },
   { href: '/admin/instructors?new=1', label: 'Ajouter un moniteur', hint: 'Invitation par email' },
   { href: '/admin/instructors?tab=applications', label: 'Valider un justificatif', hint: 'Candidatures moniteurs' },
-  { href: '/admin/students?filter=unpaid', label: 'Valider un paiement', hint: 'Achats en attente' },
+  { href: '/admin/sales?tab=invoices', label: 'Factures & paie', hint: 'PDF, impayés, heures moniteurs' },
 ];
 
 export default function AdminHome() {
@@ -50,16 +51,16 @@ export default function AdminHome() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Kpi label={`Chiffre d'affaires — ${d.month.label}`} value={formatPrice(d.month.revenue)} sub={`${d.month.sales} vente${d.month.sales > 1 ? 's' : ''} encaissée${d.month.sales > 1 ? 's' : ''}`} />
         <Kpi label="Élèves actifs" value={String(d.students.active)} sub={`sur ${d.students.total} inscrits`} href="/admin/students" />
-        <Kpi label="Taux d'occupation (semaine)" value={d.occupancy.percent === null ? '—' : `${d.occupancy.percent} %`} sub={`${d.occupancy.booked_hours} h réservées / ${d.occupancy.opened_hours} h ouvertes`} href="/instructor/planning" />
+        <Kpi label="Taux d'occupation (semaine)" value={d.occupancy.percent === null ? '—' : `${d.occupancy.percent} %`} sub={`${d.occupancy.booked_hours} h réservées / ${d.occupancy.opened_hours} h ouvertes`} href="/admin/calendar" />
         <Kpi label="Note moyenne des moniteurs" value={d.rating.average === null ? '—' : `${d.rating.average.toFixed(1)} / 5`} sub={`${d.rating.count} avis`} href="/admin/reviews" />
-        <Kpi label="Impayés" value={formatPrice(d.unpaid.amount)} sub={`${d.unpaid.count} achat${d.unpaid.count > 1 ? 's' : ''} en attente`} href="/admin/students?filter=unpaid" tone={d.unpaid.count ? 'warn' : undefined} />
-        <Kpi label="Leçons aujourd'hui" value={String(d.today.lessons)} sub={`${d.today.to_review} bilan${d.today.to_review > 1 ? 's' : ''} à saisir`} href="/instructor/planning" />
+        <Kpi label="Impayés" value={formatPrice(d.unpaid.amount)} sub={`${d.unpaid.count} achat${d.unpaid.count > 1 ? 's' : ''} en attente`} href="/admin/sales" tone={d.unpaid.count ? 'warn' : undefined} />
+        <Kpi label="Leçons aujourd'hui" value={String(d.today.lessons)} sub={`${d.today.to_review} bilan${d.today.to_review > 1 ? 's' : ''} à saisir`} href="/admin/calendar" />
         <Kpi label="Moniteurs réservables" value={`${d.instructors.bookable} / ${d.instructors.total}`} sub={d.instructors.without_password ? `${d.instructors.without_password} n'ont pas encore activé leur compte` : 'Tous les comptes sont actifs'} href="/admin/instructors" />
         <Kpi label="Absences / annul. tardives (semaine)" value={String(d.today.no_shows_week)} href="/instructor/planning" />
       </div>
 
       <h2 className="text-xl mb-3">Actions rapides</h2>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {QUICK.map((q) => (
           <Link key={q.href} href={q.href} className="card py-4 hover:border-brown-300 transition-colors">
             <div className="font-semibold">{q.label} →</div>
@@ -67,6 +68,9 @@ export default function AdminHome() {
           </Link>
         ))}
       </div>
+
+      <div className="flex items-center justify-between mb-3"><h2 className="text-xl">Dernière activité</h2><Link href="/admin/activity" className="text-sm text-brown-700 hover:underline">Tout l'historique →</Link></div>
+      <div className="card">{d.activity.length === 0 ? <p className="text-sm text-brown-800/60">Aucun événement pour le moment.</p> : <ActivityList items={d.activity} />}</div>
     </AdminShell>
   );
 }

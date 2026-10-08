@@ -5,6 +5,7 @@ import api from '@/lib/api';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import AdminShell from '@/components/AdminShell';
 import ProgressGauge from '@/components/ProgressGauge';
+import PdfLink from '@/components/PdfLink';
 import { InstructorAdmin, StudentOverview } from '@/lib/admin';
 import { formatPrice } from '@/lib/offers';
 import { apiError, frDate, hm } from '@/lib/types';
@@ -98,10 +99,33 @@ export default function AdminStudentDetail() {
                   <input defaultValue={(s as any)[k] || ''} onBlur={(e) => e.target.value !== ((s as any)[k] || '') && patch({ [k]: e.target.value })} className="input-field !py-2 mt-1" /></label>
               ))}
             </dl>
-            <h3 className="font-semibold mt-4 mb-2 text-sm">Documents</h3>
-            {d.documents.length === 0 ? <p className="text-sm text-brown-800/60">Aucun document déposé.</p> : (
-              <ul className="text-sm space-y-1">{d.documents.map((doc) => <li key={doc.id}><a href={doc.file} target="_blank" rel="noreferrer" className="text-brown-700 hover:underline">{doc.document_type}</a> {doc.verified ? '✓' : <span className="text-brown-800/50">(à vérifier)</span>}</li>)}</ul>
-            )}
+            <h3 className="font-semibold mt-4 mb-2 text-sm">Dossier administratif {d.dossier.complete ? <span className="badge bg-brown-700 text-cream-50 ml-1">complet</span> : <span className="badge bg-cream-200 text-brown-800 ml-1">incomplet</span>}</h3>
+            <ul className="text-sm space-y-2">
+              {d.dossier.items.map((item) => {
+                const doc = d.documents.find((x) => x.document_type === item.type);
+                return (
+                  <li key={item.type} className="border-t border-cream-200 pt-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{item.label}</span>
+                      <span className={`badge ${item.status === 'VERIFIED' ? 'bg-brown-700 text-cream-50' : item.status === 'PENDING' ? 'bg-caramel text-brown-900' : item.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-cream-200 text-brown-800'}`}>
+                        {item.status === 'MISSING' ? 'manquant' : doc?.status_display.toLowerCase()}
+                      </span>
+                    </div>
+                    {doc && (
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                        <a href={doc.file} target="_blank" rel="noreferrer" className="text-brown-700 hover:underline">Voir le fichier ↗</a>
+                        {doc.status === 'PENDING' && <>
+                          <button onClick={() => act(() => api.post(`/admin/documents/${doc.id}/verify/`), 'Pièce validée, élève prévenu.')} className="btn-primary !py-0.5 !px-2 text-xs">Valider</button>
+                          <button onClick={() => { const n = prompt('Motif du refus (envoyé à l’élève) :'); if (n) act(() => api.post(`/admin/documents/${doc.id}/reject/`, { note: n }), 'Pièce refusée, élève prévenu.'); }} className="text-red-700 hover:underline">Refuser</button>
+                        </>}
+                        {doc.status === 'REJECTED' && <span className="text-red-700">{doc.review_note}</span>}
+                        {doc.status === 'VERIFIED' && doc.verified_by_name && <span className="text-brown-800/50">par {doc.verified_by_name}</span>}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </section>
 
           <section className="card lg:col-span-3">
@@ -119,6 +143,7 @@ export default function AdminStudentDetail() {
                       <td className="py-2 pl-4"><span className={`badge ${p.status === 'COMPLETED' ? 'bg-brown-700 text-cream-50' : p.status === 'PENDING' ? 'bg-caramel text-brown-900' : 'bg-red-100 text-red-700'}`}>{p.status_display}</span></td>
                       <td className="py-2 text-xs text-brown-800/60 whitespace-pre-line max-w-xs">{(p as any).note}</td>
                       <td className="py-2 text-right whitespace-nowrap space-x-2">
+                        {p.invoice_id && p.invoice_number && <PdfLink invoiceId={p.invoice_id} number={p.invoice_number} className="text-brown-700 text-xs hover:underline" />}
                         {p.status === 'PENDING' && <>
                           <button onClick={() => act(() => api.post(`/admin/packages/${p.id}/mark_paid/`), 'Paiement validé, heures et accès crédités.')} className="btn-primary !py-1 text-xs">Valider le paiement</button>
                           <button onClick={() => confirm('Annuler cet achat ?') && act(() => api.post(`/admin/packages/${p.id}/cancel/`), 'Achat annulé.')} className="text-red-700 text-xs hover:underline">Annuler</button>

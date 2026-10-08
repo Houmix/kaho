@@ -10,6 +10,8 @@ import { Lesson, StudentProfile } from '@/lib/types';
 const links = [
   { href: '/student/reservation', title: 'Réserver une leçon', text: 'Créneaux disponibles et points de rendez-vous' },
   { href: '/student/notebook', title: 'Livret d’apprentissage', text: 'Bilans de leçons et compétences validées' },
+  { href: '/code', title: 'Code en ligne', text: 'Cours, quiz et examens blancs' },
+  { href: '/student/documents', title: 'Mes documents', text: 'Pièce d’identité, NEPH, contrat' },
   { href: '/student/purchases', title: 'Offres & heures', text: 'Formules, recharges et accès au code en ligne' },
 ];
 
@@ -37,6 +39,12 @@ export default function StudentDashboard() {
     <AppShell title="Mon espace">
         <h1 className="text-3xl mb-6">Bonjour, {user?.first_name} 👋</h1>
 
+        {!profile.dossier.complete && (
+          <Link href="/student/documents" className="card block mb-6 hover:border-brown-300">
+            <p className="font-semibold">Dossier administratif incomplet</p>
+            <p className="text-sm text-brown-800/70">{profile.dossier.missing} pièce{profile.dossier.missing > 1 ? 's' : ''} à fournir{profile.dossier.pending ? ` · ${profile.dossier.pending} en vérification` : ''} →</p>
+          </Link>
+        )}
         {toRate.length > 0 && (
           <Link href="/student/notebook" className="card block mb-6 border-caramel bg-brown-50 hover:border-brown-300">
             <p className="font-semibold">Comment s'est passée votre dernière leçon ?</p>

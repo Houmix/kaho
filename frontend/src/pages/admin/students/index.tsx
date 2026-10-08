@@ -14,6 +14,8 @@ const FILTERS = [
   { key: 'low', label: '≤ 1 h de crédit' },
   { key: 'ready', label: 'Prêts pour l’examen' },
   { key: 'lms', label: 'Accès code en ligne' },
+  { key: 'documents', label: 'Pièces à vérifier' },
+  { key: 'incomplete', label: 'Dossier incomplet' },
 ];
 
 function NewStudentForm({ onDone }: { onDone: () => void }) {
@@ -106,13 +108,14 @@ export default function AdminStudents() {
               <th className="text-right py-3 px-4 font-medium">Réservées</th>
               <th className="text-right py-3 px-4 font-medium">Compétences</th>
               <th className="text-left py-3 px-4 font-medium">Code</th>
+              <th className="text-left py-3 px-4 font-medium">Dossier</th>
               <th className="text-left py-3 px-4 font-medium">Référent</th>
               <th className="text-left py-3 px-4 font-medium">Examen</th>
             </tr>
           </thead>
           <tbody>
-            {!data ? <tr><td colSpan={8} className="py-10 text-center text-brown-500">Chargement…</td></tr>
-              : data.results.length === 0 ? <tr><td colSpan={8} className="py-10 text-center text-brown-800/60">Aucun élève</td></tr>
+            {!data ? <tr><td colSpan={9} className="py-10 text-center text-brown-500">Chargement…</td></tr>
+              : data.results.length === 0 ? <tr><td colSpan={9} className="py-10 text-center text-brown-800/60">Aucun élève</td></tr>
               : data.results.map((s) => (
                 <tr key={s.id} className="border-t border-cream-200 hover:bg-cream-50">
                   <td className="py-3 px-4"><Link href={`/admin/students/${s.id}`} className="font-medium text-brown-700 hover:underline">{s.user.last_name} {s.user.first_name}</Link></td>
@@ -121,6 +124,7 @@ export default function AdminStudents() {
                   <td className="py-3 px-4 text-right">{s.reserved_hours.toFixed(1)} h</td>
                   <td className="py-3 px-4 text-right">{s.competency_progress.percent} %</td>
                   <td className="py-3 px-4">{s.has_lms_access ? <span className="badge bg-brown-700 text-cream-50">actif</span> : <span className="text-brown-800/40">—</span>}</td>
+                  <td className="py-3 px-4">{s.dossier.complete ? <span className="badge bg-brown-700 text-cream-50">complet</span> : s.dossier.pending ? <span className="badge bg-caramel text-brown-900">{s.dossier.pending} à vérifier</span> : <span className="badge bg-cream-200 text-brown-800">{s.dossier.missing} manquante{s.dossier.missing > 1 ? 's' : ''}</span>}</td>
                   <td className="py-3 px-4">{s.referent_instructor_name || <span className="text-brown-800/40">—</span>}</td>
                   <td className="py-3 px-4">{s.ready_for_exam ? <span className="badge bg-caramel text-brown-900">prêt</span> : ''}</td>
                 </tr>

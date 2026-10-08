@@ -39,4 +39,28 @@
   .badge {
     @apply inline-block px-2.5 py-1 rounded-full text-xs font-medium;
   }
+
+  /* Rendu Markdown des leçons et questions */
+  .prose-kaho { @apply text-brown-900 leading-relaxed; }
+  .prose-kaho > * + * { @apply mt-4; }
+  .prose-kaho h1 { @apply text-3xl mt-8 mb-3; }
+  .prose-kaho h2 { @apply text-2xl mt-8 mb-3; }
+  .prose-kaho h3 { @apply text-xl mt-6 mb-2; }
+  .prose-kaho p, .prose-kaho li { @apply text-[15.5px]; }
+  .prose-kaho ul { @apply list-disc pl-6 space-y-1; }
+  .prose-kaho ol { @apply list-decimal pl-6 space-y-1; }
+  .prose-kaho a { @apply text-brown-700 underline; }
+  .prose-kaho strong { @apply text-brown-900 font-semibold; }
+  .prose-kaho blockquote { @apply border-l-4 border-caramel pl-4 text-brown-800/80 italic; }
+  .prose-kaho img { @apply rounded-xl border border-cream-200 max-w-full; }
+  .prose-kaho table { @apply w-full text-sm border-collapse; }
+  .prose-kaho th, .prose-kaho td { @apply border border-cream-300 px-3 py-2 text-left align-top; }
+  .prose-kaho th { @apply bg-cream-100 font-semibold; }
+  .prose-kaho code { @apply font-mono text-[13.5px] bg-cream-200 rounded px-1 py-0.5; }
+  .prose-kaho pre { @apply rounded-xl overflow-x-auto text-[13px] leading-relaxed; }
+  .prose-kaho pre code { @apply bg-transparent p-0 block; }
+  .prose-kaho pre code.hljs { @apply bg-brown-900 text-cream-100 p-4; }
+  .prose-kaho hr { @apply border-cream-300; }
+  .prose-compact p { @apply text-base; }
+  .prose-compact > * + * { @apply mt-2; }
 }

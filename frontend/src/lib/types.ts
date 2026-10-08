@@ -49,6 +49,24 @@ export interface Unavailability {
   reason: string;
 }
 
+export interface DossierItem { type: string; label: string; status: 'MISSING' | 'PENDING' | 'VERIFIED' | 'REJECTED'; note: string }
+export interface Dossier { items: DossierItem[]; complete: boolean; pending: number; missing: number }
+export interface DocumentItem {
+  id: number;
+  student: number;
+  student_name: string;
+  document_type: string;
+  document_type_display: string;
+  file: string;
+  file_name: string;
+  uploaded_at: string;
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  status_display: string;
+  review_note: string;
+  reviewed_at: string | null;
+  verified_by_name: string | null;
+}
+
 export interface CompetencyProgress {
   acquired: number;
   in_progress: number;
@@ -71,6 +89,7 @@ export interface StudentProfile {
   license_type: 'AUTO' | 'MANUAL';
   referent_instructor_name: string | null;
   competency_progress: CompetencyProgress;
+  dossier: Dossier;
   created_at?: string;
 }
 

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
@@ -397,16 +397,21 @@ class Package(models.Model):
 
     def save(self, *args, **kwargs):
         # Crédite heures + accès LMS une seule fois, au passage en COMPLETED
+        is_new = self._state.adding
         was_completed = False
-        if not self._state.adding:
+        if not is_new:
             was_completed = Package.objects.filter(pk=self.pk, status='COMPLETED').exists()
         granted = self.status == 'COMPLETED' and not was_completed
         if granted:
             self._grant()
         super().save(*args, **kwargs)
+        self._sync_invoice(is_new)
         if granted:
             from .tasks import send_payment_confirmation
             send_payment_confirmation.delay(self.pk)
+            label = self.offer.name if self.offer else f"{self.hours_purchased:g} h"
+            log_activity('PAYMENT' if self.amount_paid else 'HOURS_ADDED',
+                         f"{self.student.user.get_full_name()} — {label} ({self.amount_paid} €) validé", student=self.student)
 
     def _grant(self):
         today = timezone.localdate()
@@ -427,6 +432,85 @@ class Package(models.Model):
                 update += ['lms_access', 'lms_access_until']
         st.save(update_fields=update)
 
+    def _sync_invoice(self, is_new):
+        """Une facture par achat payant : émise à la commande, soldée au paiement, annulée si l'achat l'est."""
+        if not self.amount_paid:
+            return
+        invoice = getattr(self, 'invoice', None) if not is_new else None
+        if invoice is None:
+            invoice = Invoice.issue(self)
+        new_status = {'PENDING': 'ISSUED', 'COMPLETED': 'PAID', 'FAILED': 'CANCELLED'}[self.status]
+        if invoice.status != new_status:
+            invoice.status = new_status
+            invoice.paid_at = self.paid_at if new_status == 'PAID' else None
+            invoice.save(update_fields=['status', 'paid_at'])
+
+
+class InvoiceSequence(models.Model):
+    year = models.PositiveIntegerField(unique=True)
+    last = models.PositiveIntegerField(default=0)
+
+
+class Invoice(models.Model):
+    STATUS_CHOICES = [('ISSUED', 'Émise — à régler'), ('PAID', 'Payée'), ('CANCELLED', 'Annulée')]
+
+    number = models.CharField(max_length=30, unique=True)
+    package = models.OneToOneField(Package, on_delete=models.PROTECT, related_name='invoice')
+    student = models.ForeignKey(StudentProfile, on_delete=models.PROTECT, related_name='invoices')
+    label = models.CharField(max_length=200)
+    quantity_hours = models.FloatField(default=0)
+    amount_ttc = models.DecimalField(max_digits=10, decimal_places=2)
+    vat_rate = models.DecimalField(max_digits=5, decimal_places=2)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='ISSUED')
+    issued_at = models.DateField()
+    due_at = models.DateField()
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-issued_at', '-id']
+        verbose_name = "Facture"
+
+    def __str__(self):
+        return f"{self.number} — {self.student.user.get_full_name()} — {self.amount_ttc} €"
+
+    @property
+    def amount_ht(self):
+        from decimal import Decimal, ROUND_HALF_UP
+        return (self.amount_ttc / (1 + self.vat_rate / Decimal(100))).quantize(Decimal('0.01'), ROUND_HALF_UP)
+
+    @property
+    def amount_vat(self):
+        return self.amount_ttc - self.amount_ht
+
+    @property
+    def is_overdue(self):
+        return self.status == 'ISSUED' and self.due_at < timezone.localdate()
+
+    @classmethod
+    def issue(cls, package):
+        from decimal import Decimal
+        from django.conf import settings
+        from django.db import transaction
+        today = timezone.localdate()
+        with transaction.atomic():
+            seq, _ = InvoiceSequence.objects.select_for_update().get_or_create(year=today.year)
+            seq.last += 1
+            seq.save(update_fields=['last'])
+            number = f"{settings.INVOICE_PREFIX}-{today.year}-{seq.last:04d}"
+        label = package.offer.name if package.offer else f"Heures de conduite ({package.hours_purchased:g} h)"
+        return cls.objects.create(
+            number=number, package=package, student=package.student, label=label,
+            quantity_hours=package.hours_purchased, amount_ttc=package.amount_paid,
+            vat_rate=Decimal(str(settings.INVOICE_VAT_RATE)), issued_at=today, due_at=today + timedelta(days=30),
+            status={'PENDING': 'ISSUED', 'COMPLETED': 'PAID', 'FAILED': 'CANCELLED'}[package.status],
+            paid_at=package.paid_at if package.status == 'COMPLETED' else None,
+        )
+
+
+def document_upload_to(instance, filename):
+    return f"documents/{instance.student_id}/{instance.document_type.lower()}/{filename}"
+
 
 class Document(models.Model):
     TYPE_CHOICES = [
@@ -435,11 +519,16 @@ class Document(models.Model):
         ('CONTRACT', 'Contrat de formation'),
     ]
 
+    STATUS_CHOICES = [('PENDING', 'À vérifier'), ('VERIFIED', 'Validé'), ('REJECTED', 'Refusé')]
+    REQUIRED_TYPES = ('IDENTITY', 'NEPH_CERTIFICATE', 'CONTRACT')
+
     student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='documents')
     document_type = models.CharField(max_length=50, choices=TYPE_CHOICES)
-    file = models.FileField(upload_to='documents/%Y/%m/')
+    file = models.FileField(upload_to=document_upload_to)
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    verified = models.BooleanField(default=False)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    review_note = models.CharField("Motif (si refus)", max_length=255, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
     verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='verified_documents')
 
     class Meta:
@@ -448,6 +537,51 @@ class Document(models.Model):
 
     def __str__(self):
         return f"{self.student.user.get_full_name()} - {self.get_document_type_display()}"
+
+    @property
+    def verified(self):
+        return self.status == 'VERIFIED'
+
+    @classmethod
+    def dossier(cls, student):
+        """Synthèse du dossier administratif : par pièce requise, statut courant."""
+        docs = {d.document_type: d for d in student.documents.all()}
+        items = [{'type': t, 'label': dict(cls.TYPE_CHOICES)[t], 'status': docs[t].status if t in docs else 'MISSING',
+                  'note': docs[t].review_note if t in docs else ''} for t in cls.REQUIRED_TYPES]
+        return {'items': items, 'complete': all(i['status'] == 'VERIFIED' for i in items),
+                'pending': sum(1 for i in items if i['status'] == 'PENDING'), 'missing': sum(1 for i in items if i['status'] in ('MISSING', 'REJECTED'))}
+
+
+class ActivityLog(models.Model):
+    """Journal des événements notables (réservations, absences, paiements, candidatures…)."""
+    KINDS = [
+        ('BOOKING', 'Réservation'), ('CANCELLATION', 'Annulation'), ('LATE_CANCELLATION', 'Annulation tardive'),
+        ('NO_SHOW', 'Absence'), ('REFUND', 'Re-crédit'), ('SLOT_MOVED', 'Créneau déplacé'),
+        ('PAYMENT', 'Paiement'), ('HOURS_ADDED', 'Heures ajoutées'), ('APPLICATION', 'Candidature'),
+        ('INSTRUCTOR', 'Moniteur'), ('LESSON', 'Bilan'), ('REMINDERS', 'Rappels'), ('DOCUMENT', 'Document'),
+    ]
+    kind = models.CharField(max_length=20, choices=KINDS)
+    message = models.CharField(max_length=300)
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    student = models.ForeignKey('StudentProfile', on_delete=models.SET_NULL, null=True, blank=True, related_name='activity')
+    instructor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='instructor_activity')
+    slot = models.ForeignKey('Slot', on_delete=models.SET_NULL, null=True, blank=True, related_name='activity')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Activité"
+
+    def __str__(self):
+        return f"[{self.get_kind_display()}] {self.message}"
+
+
+def log_activity(kind, message, actor=None, student=None, instructor=None, slot=None):
+    return ActivityLog.objects.create(
+        kind=kind, message=message[:300],
+        actor=actor if (actor is not None and getattr(actor, 'is_authenticated', False)) else None,
+        student=student, instructor=instructor, slot=slot,
+    )
 
 
 def _application_upload(instance, filename):

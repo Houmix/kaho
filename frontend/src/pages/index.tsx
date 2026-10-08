@@ -62,6 +62,7 @@ export default function Home() {
             <div className="flex flex-wrap gap-3">
               <Link href="/signup" className="btn-primary">Commencer</Link>
               <a href="#tarifs" className="btn-outline">Voir les tarifs</a>
+              <Link href="/demo" className="btn-secondary">Essayer le code gratuitement</Link>
             </div>
           </div>
           <img src="/hero.svg" alt="" className="w-full rounded-3xl shadow-warm" />

@@ -30,8 +30,9 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // Handle 401 - Token expired
-    if (error.response?.status === 401 && originalRequest) {
+    if (error.response?.status === 401 && originalRequest && !(originalRequest as any)._anonRetry) {
       const { refreshToken, setToken } = getAuthStore();
+      const hadAuth = !!originalRequest.headers?.Authorization;
 
       if (refreshToken) {
         try {
@@ -49,8 +50,14 @@ api.interceptors.response.use(
           return api(originalRequest);
         } catch (refreshError) {
           getAuthStore().logout();
-          return Promise.reject(refreshError);
         }
+      }
+      // Jeton invalide ou expiré sans rafraîchissement possible : les pages publiques
+      // (démo, cours en accès libre) doivent continuer à fonctionner en anonyme.
+      if (hadAuth) {
+        (originalRequest as any)._anonRetry = true;
+        if (originalRequest.headers) delete originalRequest.headers.Authorization;
+        return axios(originalRequest);
       }
     }
 

@@ -9,6 +9,7 @@ const LINKS = {
   guest: [
     { href: '/', label: 'Accueil', hint: 'Présentation, simulateur et offres' },
     { href: '/#tarifs', label: 'Nos offres', hint: 'Formules permis, code, perfectionnement' },
+    { href: '/demo', label: 'Essai gratuit du code', hint: 'Un chapitre et 10 questions offerts' },
     { href: '/login', label: 'Connexion', hint: 'Accéder à mon espace' },
     { href: '/signup', label: 'Créer un compte', hint: 'Je suis nouveau' },
   ],
@@ -16,6 +17,7 @@ const LINKS = {
     { href: '/student/dashboard', label: 'Mon espace', hint: 'Heures, progression, prochaines leçons' },
     { href: '/student/reservation', label: 'Réserver une leçon', hint: 'Créneaux disponibles' },
     { href: '/student/notebook', label: 'Mon livret', hint: 'Compétences et bilans' },
+    { href: '/student/documents', label: 'Mes documents', hint: 'Dossier administratif' },
     { href: '/student/purchases', label: 'Offres & heures', hint: 'Formules et recharges' },
   ],
   INSTRUCTOR: [

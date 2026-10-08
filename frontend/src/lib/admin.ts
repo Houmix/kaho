@@ -1,4 +1,4 @@
-import { Lesson, Slot, StudentProfile, Availability } from './types';
+import { Lesson, Slot, StudentProfile, Availability, DocumentItem, Dossier } from './types';
 import { Package } from './offers';
 
 export interface Overview {
@@ -10,6 +10,73 @@ export interface Overview {
   rating: { average: number | null; count: number };
   today: { lessons: number; to_review: number; no_shows_week: number };
   alerts: { kind: string; count: number; text: string; href: string }[];
+  activity: ActivityEntry[];
+}
+
+export interface ActivityEntry {
+  id: number;
+  kind: string;
+  kind_display: string;
+  message: string;
+  actor_name: string | null;
+  student: number | null;
+  student_name: string | null;
+  instructor: number | null;
+  instructor_name: string | null;
+  slot: number | null;
+  created_at: string;
+}
+
+export interface CalendarData {
+  slots: Slot[];
+  unavailabilities: { id: number; instructor: number; instructor_name: string; start: string; end: string; reason: string }[];
+  availabilities: { instructor: number; weekday: number; start_time: string; end_time: string }[];
+  instructors: { id: number; name: string; is_bookable: boolean }[];
+  meeting_points: { id: number; name: string }[];
+}
+
+export interface Invoice {
+  id: number;
+  number: string;
+  package: number;
+  student: number;
+  student_name: string;
+  student_email: string;
+  label: string;
+  quantity_hours: number;
+  amount_ht: string;
+  amount_vat: string;
+  amount_ttc: string;
+  vat_rate: string;
+  status: 'ISSUED' | 'PAID' | 'CANCELLED';
+  status_display: string;
+  is_overdue: boolean;
+  issued_at: string;
+  due_at: string;
+  paid_at: string | null;
+}
+
+export interface SalesData {
+  months: { month: string; label: string; revenue: number; sales: number }[];
+  year_revenue: number;
+  unpaid: { count: number; amount: number; overdue: number; items: Invoice[] };
+  invoices_count: number;
+}
+
+export interface PayrollRow {
+  id: number;
+  name: string;
+  email: string;
+  hourly_rate: number;
+  hours: number;
+  lessons: number;
+  no_shows: number;
+  amount: number;
+  details: { date: string; start_time: string; hours: number; student: string; place: string }[];
+}
+
+export function invoicePdfUrl(id: number) {
+  return `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/$/, '')}/invoices/${id}/pdf/`;
 }
 
 export interface SearchResults {
@@ -74,7 +141,8 @@ export interface StudentOverview {
   upcoming_slots: Slot[];
   past_slots: Slot[];
   lessons: Lesson[];
-  documents: { id: number; document_type: string; file: string; verified: boolean; uploaded_at: string }[];
+  documents: DocumentItem[];
+  dossier: Dossier;
   progress: { acquired: number; in_progress: number; total: number; percent: number };
 }
 
