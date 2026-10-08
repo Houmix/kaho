@@ -117,24 +117,30 @@ USE_GCS = config('USE_GCS', default=False, cast=bool)
 if USE_GCS:
     import base64
     import json
-    from google.oauth2 import service_account
+    import sys
 
-    _raw = config('GCS_CREDENTIALS')
     try:
-        _info = json.loads(_raw)
-    except ValueError:
-        _info = json.loads(base64.b64decode(_raw))
-    GS_CREDENTIALS = service_account.Credentials.from_service_account_info(_info)
-    GS_BUCKET_NAME = config('GCS_BUCKET_NAME')
-    GS_PROJECT_ID = _info.get('project_id')
-    GS_DEFAULT_ACL = None          # bucket en accès uniforme : pas d'ACL par objet
-    GS_QUERYSTRING_AUTH = True     # URLs signées temporaires pour les fichiers privés
-    GS_EXPIRATION = timedelta(minutes=30)
-    GS_FILE_OVERWRITE = False
-    STORAGES = {
-        'default': {'BACKEND': 'storages.backends.gcloud.GoogleCloudStorage'},
-        'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
-    }
+        from google.oauth2 import service_account
+
+        _raw = config('GCS_CREDENTIALS')
+        try:
+            _info = json.loads(_raw)
+        except ValueError:
+            _info = json.loads(base64.b64decode(_raw))
+        GS_CREDENTIALS = service_account.Credentials.from_service_account_info(_info)
+        GS_BUCKET_NAME = config('GCS_BUCKET_NAME')
+        GS_PROJECT_ID = _info.get('project_id')
+        GS_DEFAULT_ACL = None          # bucket en accès uniforme : pas d'ACL par objet
+        GS_QUERYSTRING_AUTH = True     # URLs signées temporaires pour les fichiers privés
+        GS_EXPIRATION = timedelta(minutes=30)
+        GS_FILE_OVERWRITE = False
+        STORAGES = {
+            'default': {'BACKEND': 'storages.backends.gcloud.GoogleCloudStorage'},
+            'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+        }
+    except Exception as exc:  # une clé GCS invalide ne doit pas empêcher l'API de démarrer
+        print(f"[GCS] configuration invalide, stockage local utilisé à la place : {exc}", file=sys.stderr)
+        USE_GCS = False
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
