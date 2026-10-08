@@ -1,10 +1,10 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import User, StudentProfile, MeetingPoint, Slot, Lesson, Package, Document, VehicleLog
+from .models import User, StudentProfile, MeetingPoint, Slot, Lesson, Offer, Package, Document, VehicleLog
 from .serializers import (
-    UserSerializer, StudentProfileSerializer, MeetingPointSerializer,
-    SlotSerializer, LessonSerializer, PackageSerializer, DocumentSerializer, VehicleLogSerializer
+    UserSerializer, StudentProfileSerializer, MeetingPointSerializer, SlotSerializer,
+    LessonSerializer, OfferSerializer, PackageSerializer, DocumentSerializer, VehicleLogSerializer
 )
 
 
@@ -120,10 +120,21 @@ class LessonViewSet(viewsets.ModelViewSet):
         serializer.save()
 
 
+class OfferViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Offer.objects.filter(is_active=True)
+    serializer_class = OfferSerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = None
+
+
 class PackageViewSet(viewsets.ModelViewSet):
     queryset = Package.objects.all()
     serializer_class = PackageSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'post', 'head', 'options']
+
+    def perform_create(self, serializer):
+        serializer.save(student=StudentProfile.objects.get(user=self.request.user))
 
     def get_queryset(self):
         if self.request.user.role == 'INSTRUCTOR':

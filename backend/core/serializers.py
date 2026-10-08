@@ -1,5 +1,32 @@
 from rest_framework import serializers
-from .models import User, StudentProfile, MeetingPoint, Slot, Lesson, Package, Document, VehicleLog
+from .models import User, StudentProfile, MeetingPoint, Slot, Lesson, Offer, Package, Document, VehicleLog
+
+
+class RegisterSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True, min_length=8)
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Un compte existe déjà avec cet email.")
+        return value.lower()
+
+    def create(self, validated_data):
+        return User.objects.create_user(
+            username=validated_data['email'],
+            role='STUDENT',
+            **validated_data,
+        )
+
+
+class OfferSerializer(serializers.ModelSerializer):
+    price_per_hour = serializers.FloatField(read_only=True)
+
+    class Meta:
+        model = Offer
+        fields = ('id', 'name', 'description', 'hours', 'price', 'price_per_hour', 'is_featured')
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -61,14 +88,23 @@ class LessonSerializer(serializers.ModelSerializer):
 
 class PackageSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
+    offer = serializers.PrimaryKeyRelatedField(queryset=Offer.objects.filter(is_active=True))
+    offer_name = serializers.CharField(source='offer.name', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
+    def create(self, validated_data):
+        offer = validated_data['offer']
+        validated_data['hours_purchased'] = offer.hours
+        validated_data['amount_paid'] = offer.price
+        return super().create(validated_data)
 
     class Meta:
         model = Package
         fields = (
-            'id', 'student', 'student_name', 'hours_purchased', 'amount_paid',
-            'stripe_payment_id', 'status', 'created_at', 'updated_at'
+            'id', 'student', 'student_name', 'offer', 'offer_name', 'hours_purchased',
+            'amount_paid', 'status', 'status_display', 'created_at', 'updated_at'
         )
-        read_only_fields = ('id', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'student', 'hours_purchased', 'amount_paid', 'status', 'created_at', 'updated_at')
 
 
 class DocumentSerializer(serializers.ModelSerializer):

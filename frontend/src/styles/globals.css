@@ -19,7 +19,7 @@
     @apply max-w-screen-xl mx-auto px-4;
   }
   .btn {
-    @apply inline-flex items-center justify-center px-5 py-2.5 rounded-full font-medium transition-colors;
+    @apply inline-flex items-center justify-center px-5 py-2.5 rounded-full font-medium whitespace-nowrap transition-colors;
   }
   .btn-primary {
     @apply btn bg-brown-700 text-cream-50 hover:bg-brown-800;

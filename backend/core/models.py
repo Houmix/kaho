@@ -122,23 +122,49 @@ class Lesson(models.Model):
             self.student.save(update_fields=['used_hours'])
 
 
+class Offer(models.Model):
+    name = models.CharField("Nom", max_length=100)
+    description = models.CharField("Description courte", max_length=255, blank=True)
+    hours = models.FloatField("Heures incluses", validators=[MinValueValidator(0.5)])
+    price = models.DecimalField("Prix TTC (€)", max_digits=8, decimal_places=2, validators=[MinValueValidator(0)])
+    is_featured = models.BooleanField("Mise en avant", default=False)
+    is_active = models.BooleanField("Visible sur le site", default=True)
+    display_order = models.PositiveIntegerField("Ordre d'affichage", default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['display_order', 'price']
+        verbose_name = "Offre"
+
+    def __str__(self):
+        return f"{self.name} — {self.hours}h / {self.price}€"
+
+    @property
+    def price_per_hour(self):
+        return round(float(self.price) / self.hours, 2)
+
+
 class Package(models.Model):
     STATUS_CHOICES = [
-        ('PENDING', 'En attente'),
-        ('COMPLETED', 'Validé'),
-        ('FAILED', 'Échoué'),
+        ('PENDING', 'En attente de paiement'),
+        ('COMPLETED', 'Payé — heures créditées'),
+        ('FAILED', 'Annulé'),
     ]
 
     student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='packages')
+    offer = models.ForeignKey(Offer, on_delete=models.SET_NULL, null=True, blank=True, related_name='packages')
     hours_purchased = models.FloatField(validators=[MinValueValidator(0.5)])
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
-    stripe_payment_id = models.CharField(max_length=100, unique=True)
+    stripe_payment_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    note = models.TextField("Note interne (ex: virement reçu le …)", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-created_at']
+        verbose_name = "Achat d'heures"
 
     def __str__(self):
         return f"{self.student.user.get_full_name()} - {self.hours_purchased}h - {self.get_status_display()}"

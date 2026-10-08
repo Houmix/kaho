@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import Logo from '@/components/Logo';
+import { Offer, formatPrice } from '@/lib/offers';
 
 const features = [
   { title: 'Réservation simple', text: 'Choisissez un créneau et un point de rendez-vous en quelques secondes.' },
@@ -11,15 +13,14 @@ const features = [
   { title: 'Fonctionne hors-ligne', text: 'Sur un parking sans réseau, tout se synchronise au retour de la connexion.' },
 ];
 
-const offers = [
-  { name: 'Leçon à l’unité', price: '48 €', detail: '1 heure de conduite' },
-  { name: 'Pack 10 heures', price: '450 €', detail: 'soit 45 € / heure', featured: true },
-  { name: 'Pack 20 heures', price: '860 €', detail: 'soit 43 € / heure' },
-];
-
 export default function Home() {
   const { isAuthenticated, user } = useAuth();
   const router = useRouter();
+  const [offers, setOffers] = useState<Offer[]>([]);
+
+  useEffect(() => {
+    api.get('/offers/').then((r) => setOffers(r.data)).catch(() => setOffers([]));
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -76,17 +77,22 @@ export default function Home() {
 
         <section id="tarifs" className="container py-16">
           <h2 className="text-3xl text-center mb-10">Tarifs</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            {offers.map((o) => (
-              <div key={o.name} className={`card text-center ${o.featured ? 'ring-2 ring-brown-500' : ''}`}>
-                {o.featured && <span className="badge bg-brown-700 text-cream-50 mb-3">Le plus choisi</span>}
-                <h3 className="text-xl mb-1">{o.name}</h3>
-                <p className="text-4xl font-display text-brown-700 my-3">{o.price}</p>
-                <p className="text-brown-800/70 mb-5">{o.detail}</p>
-                <Link href="/signup" className={o.featured ? 'btn-primary w-full' : 'btn-secondary w-full'}>Choisir</Link>
-              </div>
-            ))}
-          </div>
+          {offers.length === 0 ? (
+            <p className="text-center text-brown-800/60">Les offres seront bientôt disponibles.</p>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-6">
+              {offers.map((o) => (
+                <div key={o.id} className={`card text-center ${o.is_featured ? 'ring-2 ring-brown-500' : ''}`}>
+                  {o.is_featured && <span className="badge bg-brown-700 text-cream-50 mb-3">Le plus choisi</span>}
+                  <h3 className="text-xl mb-1">{o.name}</h3>
+                  <p className="text-4xl font-display text-brown-700 my-3">{formatPrice(o.price)}</p>
+                  <p className="text-brown-800/70">{o.hours} h de conduite</p>
+                  <p className="text-sm text-brown-800/60 mb-5">{o.description || `soit ${formatPrice(o.price_per_hour)} / heure`}</p>
+                  <Link href={`/signup?offer=${o.id}`} className={o.is_featured ? 'btn-primary w-full' : 'btn-secondary w-full'}>Choisir</Link>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </main>
 

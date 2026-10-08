@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import Logo from '@/components/Logo';
 
 interface Slot {
@@ -24,19 +25,17 @@ const statusStyle: Record<Slot['status'], { label: string; cls: string }> = {
 export default function InstructorPlanning() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { isAuthenticated, user, logout } = useAuth();
+  const { logout } = useAuth();
+  const ready = useRequireAuth('INSTRUCTOR');
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated || user?.role !== 'INSTRUCTOR') {
-      router.push('/login');
-      return;
-    }
+    if (!ready) return;
     api.get('/slots/')
       .then((r) => setSlots(r.data.results ?? r.data))
       .catch((e) => console.error(e))
       .finally(() => setIsLoading(false));
-  }, [isAuthenticated, user, router]);
+  }, [ready]);
 
   if (isLoading) return <div className="flex justify-center items-center h-screen text-brown-500">Chargement…</div>;
 

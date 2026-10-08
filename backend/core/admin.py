@@ -1,6 +1,23 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, StudentProfile, MeetingPoint, Slot, Lesson, Package, Document, VehicleLog
+from .models import User, StudentProfile, MeetingPoint, Slot, Lesson, Offer, Package, Document, VehicleLog
+
+
+@admin.register(Offer)
+class OfferAdmin(admin.ModelAdmin):
+    list_display = ('name', 'hours', 'price', 'price_per_hour', 'is_featured', 'is_active', 'display_order')
+    list_editable = ('is_featured', 'is_active', 'display_order')
+    list_filter = ('is_active', 'is_featured')
+    search_fields = ('name',)
+    fieldsets = (
+        (None, {'fields': ('name', 'description')}),
+        ('Contenu & prix', {'fields': ('hours', 'price')}),
+        ('Affichage sur le site', {'fields': ('is_active', 'is_featured', 'display_order')}),
+    )
+
+    def price_per_hour(self, obj):
+        return f"{obj.price_per_hour} €/h"
+    price_per_hour.short_description = 'Prix / heure'
 
 
 @admin.register(User)
@@ -17,6 +34,7 @@ class StudentProfileAdmin(admin.ModelAdmin):
     list_display = ('get_user_name', 'neph_number', 'purchased_hours', 'used_hours', 'remaining_hours', 'ready_for_exam')
     list_filter = ('license_type', 'ready_for_exam')
     search_fields = ('user__email', 'neph_number', 'user__first_name', 'user__last_name')
+    ordering = ('user__last_name',)
     readonly_fields = ('created_at', 'updated_at')
 
     def get_user_name(self, obj):
@@ -60,8 +78,16 @@ class LessonAdmin(admin.ModelAdmin):
 
 @admin.register(Package)
 class PackageAdmin(admin.ModelAdmin):
-    list_display = ('get_student_name', 'hours_purchased', 'amount_paid', 'status')
-    list_filter = ('status', 'created_at')
+    list_display = ('get_student_name', 'offer', 'hours_purchased', 'amount_paid', 'status', 'created_at')
+    list_editable = ('status',)
+    list_filter = ('status', 'offer', 'created_at')
+    autocomplete_fields = ('student',)
+    fieldsets = (
+        (None, {'fields': ('student', 'offer', 'hours_purchased', 'amount_paid')}),
+        ('Paiement', {'fields': ('status', 'stripe_payment_id', 'note'),
+                      'description': "Passer en « Payé » crédite automatiquement les heures à l'élève."}),
+        ('Dates', {'fields': ('created_at', 'updated_at')}),
+    )
     search_fields = ('student__user__email',)
     readonly_fields = ('created_at', 'updated_at')
 

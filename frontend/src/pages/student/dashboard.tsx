@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Head from 'next/head';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import Logo from '@/components/Logo';
 
 interface StudentProfile {
@@ -25,19 +26,17 @@ const links = [
 export default function StudentDashboard() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { isAuthenticated, user, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const ready = useRequireAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
+    if (!ready) return;
     api.get('/student-profiles/my_profile/')
       .then((r) => setProfile(r.data))
       .catch((e) => console.error(e))
       .finally(() => setIsLoading(false));
-  }, [isAuthenticated, router]);
+  }, [ready]);
 
   if (isLoading) return <div className="flex justify-center items-center h-screen text-brown-500">Chargement…</div>;
   if (!profile) return <div className="flex justify-center items-center h-screen text-brown-500">Profil introuvable</div>;
