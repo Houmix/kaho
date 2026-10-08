@@ -52,10 +52,14 @@ class CatalogTests(APITestCase):
         self.assertEqual(st.purchased_hours, 0)
         self.assertFalse(st.has_lms_access)
 
+        from django.core import mail
         pkg.status = 'COMPLETED'
         pkg.save()
         st.refresh_from_db()
         self.assertEqual(st.purchased_hours, 20)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Paiement validé', mail.outbox[0].alternatives[0][0])
+        self.assertEqual(mail.outbox[0].to, ['eleve@test.fr'])
         self.assertTrue(st.has_lms_access)
         self.assertEqual(st.lms_access_until, timezone.localdate().replace(year=timezone.localdate().year + 1))
         self.assertIsNotNone(pkg.expires_at)

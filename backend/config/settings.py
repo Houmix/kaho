@@ -160,9 +160,19 @@ CELERY_TIMEZONE = 'Europe/Paris'
 # Sans Redis configuré, les tâches s'exécutent inline (dev local, ou prod sans worker)
 CELERY_TASK_ALWAYS_EAGER = not config('REDIS_URL', default='')
 
-# Email Configuration (SendGrid — appelé directement via l'API dans core/tasks.py)
-SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@kaho.app')
+# Email — SMTP (Brevo : smtp-relay.brevo.com, login = email du compte, mot de passe = clé SMTP)
+EMAIL_HOST = config('EMAIL_HOST', default='smtp-relay.brevo.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='Kaho <noreply@kaho-auto-ecole.fr>')
+# Sans identifiants SMTP, les emails sont affichés dans les logs (dev / avant configuration)
+EMAIL_BACKEND = (
+    'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST_PASSWORD
+    else 'django.core.mail.backends.console.EmailBackend'
+)
 
 # Twilio Configuration
 TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')

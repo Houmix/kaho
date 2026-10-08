@@ -385,9 +385,13 @@ class Package(models.Model):
         was_completed = False
         if not self._state.adding:
             was_completed = Package.objects.filter(pk=self.pk, status='COMPLETED').exists()
-        if self.status == 'COMPLETED' and not was_completed:
+        granted = self.status == 'COMPLETED' and not was_completed
+        if granted:
             self._grant()
         super().save(*args, **kwargs)
+        if granted:
+            from .tasks import send_payment_confirmation
+            send_payment_confirmation.delay(self.pk)
 
     def _grant(self):
         today = timezone.localdate()
