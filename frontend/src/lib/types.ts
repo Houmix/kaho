@@ -71,6 +71,7 @@ export interface StudentProfile {
   license_type: 'AUTO' | 'MANUAL';
   referent_instructor_name: string | null;
   competency_progress: CompetencyProgress;
+  created_at?: string;
 }
 
 export interface InstructorDashboard {
@@ -114,7 +115,7 @@ export interface Lesson {
   weather_conditions: string;
   instructor_notes: string;
   assessments: Assessment[];
-  rating: { score: number; comment: string; created_at: string } | null;
+  rating: { score: number; comment: string; reply: string; created_at: string } | null;
   created_at: string;
 }
 

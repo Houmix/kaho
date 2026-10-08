@@ -5,7 +5,9 @@ from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.utils import timezone, translation
 from django.utils.formats import date_format
-from django.utils.html import strip_tags
+import html as html_lib
+
+from django.utils.html import escape, strip_tags
 
 
 def _fr_date(d):
@@ -16,7 +18,11 @@ def _fr_date(d):
 def _send_email(to_email, subject, html):
     """Envoi via le backend Django configuré (Brevo SMTP en prod, console en dev)."""
     try:
-        msg = EmailMultiAlternatives(subject, strip_tags(html), settings.DEFAULT_FROM_EMAIL, [to_email])
+        # Version texte : strip_tags laisse les entités (&amp;) que l'on décode ensuite — les URLs restent intactes
+        import re
+        text = html_lib.unescape(strip_tags(re.sub(r'</(li|p|h2|div)>|<br\s*/?>', '\n', html)))
+        text = re.sub(r'[ \t]+\n', '\n', re.sub(r'\n{3,}', '\n\n', text)).strip()
+        msg = EmailMultiAlternatives(subject, text, settings.DEFAULT_FROM_EMAIL, [to_email])
         msg.attach_alternative(html, 'text/html')
         msg.send()
     except Exception as e:  # ne jamais faire échouer l'action métier à cause d'un email
@@ -65,6 +71,7 @@ def _layout(title, body_html):
 
 @shared_task
 def send_password_reset_email(email, link):
+    link = escape(link)
     _send_email(
         email,
         'Réinitialisation de votre mot de passe — Kaho',
@@ -74,6 +81,44 @@ def send_password_reset_email(email, link):
         <p><a href="{link}" style="display:inline-block;background:#5C3D2E;color:#FBF8F3;padding:10px 18px;border-radius:999px;text-decoration:none">Choisir un nouveau mot de passe</a></p>
         <p style="font-size:13px;color:#8B5E3C">Ou copiez ce lien : {link}</p>
         <p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>"""),
+    )
+
+
+@shared_task
+def send_instructor_invite(email, first_name, link):
+    link = escape(link)
+    _send_email(
+        email,
+        'Bienvenue dans l’équipe Kaho — créez votre mot de passe',
+        _layout(f'Bienvenue, {first_name} !', f"""
+        <p>Votre compte moniteur Kaho est prêt. Il ne reste qu'à choisir votre mot de passe (lien valable 72 h) :</p>
+        <p><a href="{link}" style="display:inline-block;background:#5C3D2E;color:#FBF8F3;padding:10px 18px;border-radius:999px;text-decoration:none">Créer mon mot de passe</a></p>
+        <p style="font-size:13px;color:#8B5E3C">Ou copiez ce lien : {link}</p>
+        <p>Ensuite, renseignez vos disponibilités depuis votre espace pour que les élèves puissent réserver avec vous.</p>"""),
+    )
+
+
+@shared_task
+def send_application_received(email, first_name):
+    _send_email(
+        email,
+        'Candidature reçue — Kaho',
+        _layout('Merci pour votre candidature', f"""
+        <p>Bonjour {first_name},</p>
+        <p>Nous avons bien reçu votre candidature et vos pièces justificatives. Nous revenons vers vous rapidement après examen.</p>"""),
+    )
+
+
+@shared_task
+def send_application_rejected(email, first_name, note):
+    _send_email(
+        email,
+        'Votre candidature — Kaho',
+        _layout('Candidature non retenue', f"""
+        <p>Bonjour {first_name},</p>
+        <p>Après examen, nous ne pouvons pas donner suite à votre candidature pour le moment.</p>
+        {f'<p>{note}</p>' if note else ''}
+        <p>Merci de l'intérêt que vous portez à Kaho.</p>"""),
     )
 
 

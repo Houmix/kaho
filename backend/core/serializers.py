@@ -2,10 +2,21 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from rest_framework import serializers
 
+from django.conf import settings as dj_settings
+
 from .models import (
-    User, StudentProfile, InstructorProfile, Availability, Unavailability, MeetingPoint, Slot,
+    User, StudentProfile, InstructorProfile, InstructorApplication, Availability, Unavailability, MeetingPoint, Slot,
     Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Document, VehicleLog,
 )
+
+
+def validate_upload(f):
+    ext = (f.name.rsplit('.', 1)[-1] if '.' in f.name else '').lower()
+    if ext not in dj_settings.UPLOAD_ALLOWED_EXTENSIONS:
+        raise serializers.ValidationError(f"Format non accepté ({ext or 'inconnu'}). Formats : PDF, JPG, PNG.")
+    if f.size > dj_settings.UPLOAD_MAX_BYTES:
+        raise serializers.ValidationError("Fichier trop lourd (5 Mo maximum).")
+    return f
 
 
 # ---------- Auth ----------
@@ -92,14 +103,115 @@ class InstructorPublicSerializer(serializers.ModelSerializer):
 
 class InstructorProfileSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
+    gearbox_display = serializers.CharField(source='get_gearbox_display', read_only=True)
 
     class Meta:
         model = InstructorProfile
-        fields = ('id', 'user', 'hourly_rate', 'bio', 'is_bookable')
+        fields = ('id', 'user', 'hourly_rate', 'phone', 'gearbox', 'gearbox_display', 'vehicle', 'bio', 'is_bookable')
         read_only_fields = ('id', 'hourly_rate')
 
     def get_user(self, obj):
         return UserSerializer(obj.user).data
+
+
+# ---------- Back-office ----------
+
+class InstructorCreateSerializer(serializers.Serializer):
+    """Création d'un moniteur par l'admin ; un email d'invitation (création du mot de passe) est envoyé."""
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    hourly_rate = serializers.DecimalField(max_digits=7, decimal_places=2, required=False, default=0)
+    gearbox = serializers.ChoiceField(choices=['AUTO', 'MANUAL', 'BOTH'], required=False, default='BOTH')
+    vehicle = serializers.CharField(max_length=100, required=False, allow_blank=True)
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Un compte existe déjà avec cet email.")
+        return value.lower()
+
+    def create(self, validated_data):
+        profile_fields = {k: validated_data.pop(k) for k in ('phone', 'hourly_rate', 'gearbox', 'vehicle') if k in validated_data}
+        user = User.objects.create_user(username=validated_data['email'], role='INSTRUCTOR', **validated_data)
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
+        profile, _ = InstructorProfile.objects.get_or_create(user=user)
+        for k, v in profile_fields.items():
+            setattr(profile, k, v)
+        profile.save()
+        user.refresh_from_db()  # vide le profil mis en cache par le signal post_save
+        return user
+
+
+class InstructorAdminSerializer(serializers.ModelSerializer):
+    """Vue admin d'un moniteur : identité + profil + activité."""
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    profile = InstructorProfileSerializer(source='instructor_profile', read_only=True)
+    has_password = serializers.SerializerMethodField()
+    stats = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'first_name', 'last_name', 'full_name', 'is_active', 'has_password', 'profile', 'stats', 'created_at')
+
+    def get_has_password(self, obj):
+        return obj.has_usable_password()
+
+    def get_stats(self, obj):
+        from django.db.models import Avg, Count
+        from django.utils import timezone
+        today = timezone.localdate()
+        r = LessonRating.objects.filter(lesson__slot__instructor=obj).aggregate(avg=Avg('score'), n=Count('id'))
+        return {
+            'upcoming': Slot.objects.filter(instructor=obj, status='BOOKED', date__gte=today).count(),
+            'lessons': Lesson.objects.filter(slot__instructor=obj).count(),
+            'students': StudentProfile.objects.filter(booked_slots__instructor=obj).distinct().count(),
+            'availability_slots': Availability.objects.filter(instructor=obj).count(),
+            'rating_average': round(r['avg'], 2) if r['avg'] else None,
+            'rating_count': r['n'],
+        }
+
+
+class InstructorApplicationSerializer(serializers.ModelSerializer):
+    gearbox_display = serializers.CharField(source='get_gearbox_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    reviewed_by_name = serializers.CharField(source='reviewed_by.get_full_name', read_only=True, default=None)
+
+    class Meta:
+        model = InstructorApplication
+        fields = (
+            'id', 'first_name', 'last_name', 'email', 'phone', 'gearbox', 'gearbox_display', 'message',
+            'diploma', 'driving_license', 'business_doc', 'status', 'status_display', 'admin_note',
+            'reviewed_by_name', 'reviewed_at', 'created_user', 'created_at',
+        )
+        read_only_fields = ('id', 'status', 'admin_note', 'reviewed_by_name', 'reviewed_at', 'created_user', 'created_at')
+
+    def validate_email(self, value):
+        value = value.lower()
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Un compte existe déjà avec cet email. Connectez-vous ou utilisez « mot de passe oublié ».")
+        if InstructorApplication.objects.filter(email__iexact=value, status='PENDING').exists():
+            raise serializers.ValidationError("Une candidature est déjà en cours d'examen pour cet email.")
+        return value
+
+    validate_diploma = staticmethod(validate_upload)
+    validate_driving_license = staticmethod(validate_upload)
+
+    def validate_business_doc(self, f):
+        return validate_upload(f) if f else f
+
+
+class RatingModerationSerializer(serializers.ModelSerializer):
+    student_name = serializers.CharField(source='lesson.student.user.get_full_name', read_only=True)
+    instructor_name = serializers.CharField(source='lesson.slot.instructor.get_full_name', read_only=True)
+    instructor_id = serializers.IntegerField(source='lesson.slot.instructor_id', read_only=True)
+    lesson_date = serializers.DateField(source='lesson.slot.date', read_only=True)
+
+    class Meta:
+        model = LessonRating
+        fields = ('id', 'score', 'comment', 'reply', 'is_hidden', 'student_name', 'instructor_name', 'instructor_id', 'lesson_date', 'created_at')
+        read_only_fields = ('id', 'score', 'comment', 'created_at')
 
 
 # ---------- Planning ----------
@@ -210,8 +322,8 @@ class CompetencyAssessmentSerializer(serializers.ModelSerializer):
 class LessonRatingSerializer(serializers.ModelSerializer):
     class Meta:
         model = LessonRating
-        fields = ('score', 'comment', 'created_at')
-        read_only_fields = ('created_at',)
+        fields = ('score', 'comment', 'reply', 'created_at')
+        read_only_fields = ('reply', 'created_at')
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -302,9 +414,9 @@ class PackageSerializer(serializers.ModelSerializer):
         model = Package
         fields = (
             'id', 'student', 'student_name', 'offer', 'offer_name', 'offer_category', 'includes_lms',
-            'hours_purchased', 'amount_paid', 'status', 'status_display', 'expires_at', 'created_at', 'updated_at',
+            'hours_purchased', 'amount_paid', 'status', 'status_display', 'paid_at', 'expires_at', 'note', 'created_at', 'updated_at',
         )
-        read_only_fields = ('id', 'student', 'hours_purchased', 'amount_paid', 'status', 'expires_at', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'student', 'hours_purchased', 'amount_paid', 'status', 'paid_at', 'expires_at', 'note', 'created_at', 'updated_at')
 
 
 # ---------- Divers ----------

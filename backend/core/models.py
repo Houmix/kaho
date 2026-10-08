@@ -42,7 +42,8 @@ class StudentProfile(models.Model):
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
-    neph_number = models.CharField(max_length=50, unique=True, blank=True)
+    # NULL (et non '') quand absent : unique=True n'accepte qu'une seule chaîne vide
+    neph_number = models.CharField("N° NEPH", max_length=50, unique=True, null=True, blank=True)
     phone = models.CharField("Téléphone mobile (SMS)", max_length=20, blank=True)
     purchased_hours = models.FloatField(default=0, validators=[MinValueValidator(0)])
     used_hours = models.FloatField(default=0, validators=[MinValueValidator(0)])
@@ -64,7 +65,11 @@ class StudentProfile(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.user.get_full_name()} - NEPH: {self.neph_number}"
+        return f"{self.user.get_full_name()} - NEPH: {self.neph_number or '—'}"
+
+    def save(self, *args, **kwargs):
+        self.neph_number = (self.neph_number or '').strip() or None
+        super().save(*args, **kwargs)
 
     @property
     def remaining_hours(self):
@@ -97,9 +102,15 @@ class StudentProfile(models.Model):
         return {'acquired': acquired, 'in_progress': in_progress, 'total': total, 'percent': round(100 * acquired / total)}
 
 
+GEARBOX_CHOICES = [('AUTO', 'Boîte automatique'), ('MANUAL', 'Boîte manuelle'), ('BOTH', 'Les deux')]
+
+
 class InstructorProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='instructor_profile')
     hourly_rate = models.DecimalField("Taux horaire (€)", max_digits=7, decimal_places=2, default=0)
+    phone = models.CharField("Téléphone", max_length=20, blank=True)
+    gearbox = models.CharField("Boîte enseignée", max_length=10, choices=GEARBOX_CHOICES, default='BOTH')
+    vehicle = models.CharField("Véhicule", max_length=100, blank=True)
     bio = models.TextField(blank=True)
     is_bookable = models.BooleanField("Réservable par les élèves", default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -301,6 +312,8 @@ class LessonRating(models.Model):
     lesson = models.OneToOneField(Lesson, on_delete=models.CASCADE, related_name='rating')
     score = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
     comment = models.TextField(blank=True)
+    reply = models.TextField("Réponse de l'école", blank=True)
+    is_hidden = models.BooleanField("Masqué (modération)", default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -369,6 +382,7 @@ class Package(models.Model):
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     stripe_payment_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    paid_at = models.DateTimeField("Payé le", null=True, blank=True)
     expires_at = models.DateField("Fin de validité", null=True, blank=True)
     note = models.TextField("Note interne (ex: virement reçu le …)", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -396,6 +410,7 @@ class Package(models.Model):
 
     def _grant(self):
         today = timezone.localdate()
+        self.paid_at = timezone.now()
         st = self.student
         st.purchased_hours += self.hours_purchased
         update = ['purchased_hours']
@@ -433,6 +448,38 @@ class Document(models.Model):
 
     def __str__(self):
         return f"{self.student.user.get_full_name()} - {self.get_document_type_display()}"
+
+
+def _application_upload(instance, filename):
+    return f"applications/{instance.email.replace('@', '_at_')}/{filename}"
+
+
+class InstructorApplication(models.Model):
+    """Candidature spontanée d'un moniteur via /devenir-moniteur."""
+    STATUS_CHOICES = [('PENDING', 'À examiner'), ('APPROVED', 'Acceptée'), ('REJECTED', 'Refusée')]
+
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20, blank=True)
+    gearbox = models.CharField(max_length=10, choices=GEARBOX_CHOICES, default='BOTH')
+    message = models.TextField(blank=True)
+    diploma = models.FileField("Diplôme / autorisation d'enseigner", upload_to=_application_upload)
+    driving_license = models.FileField("Permis de conduire", upload_to=_application_upload)
+    business_doc = models.FileField("Kbis / statut auto-entrepreneur", upload_to=_application_upload, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    admin_note = models.TextField(blank=True)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_applications')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='application')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Candidature moniteur"
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} — {self.get_status_display()}"
 
 
 class VehicleLog(models.Model):

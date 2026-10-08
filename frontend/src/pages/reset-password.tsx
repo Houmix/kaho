@@ -12,6 +12,7 @@ export default function ResetPassword() {
   const router = useRouter();
   const uid = typeof router.query.uid === 'string' ? router.query.uid : null;
   const token = typeof router.query.token === 'string' ? router.query.token : null;
+  const isInvite = router.query.invite === '1';
   const { setToken, setUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,7 +52,8 @@ export default function ResetPassword() {
       <div className="min-h-screen flex items-center justify-center p-6">
         <form onSubmit={isConfirm ? confirm : request} className="w-full max-w-sm space-y-5">
           <div className="mb-6"><Logo /></div>
-          <h1 className="text-3xl">{isConfirm ? 'Nouveau mot de passe' : 'Mot de passe oublié'}</h1>
+          <h1 className="text-3xl">{isConfirm ? (isInvite ? 'Bienvenue ! Créez votre mot de passe' : 'Nouveau mot de passe') : 'Mot de passe oublié'}</h1>
+          {isInvite && isConfirm && <p className="text-sm text-brown-800/70">Votre compte moniteur est prêt. Choisissez un mot de passe pour accéder à votre espace et saisir vos disponibilités.</p>}
 
           {info && <div className="rounded-xl border border-brown-300 bg-brown-50 text-brown-900 px-4 py-3 text-sm">{info}</div>}
           {error && <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</div>}
@@ -69,7 +71,7 @@ export default function ResetPassword() {
           )}
 
           <button type="submit" disabled={busy} className="btn-primary w-full disabled:opacity-60">
-            {busy ? 'Un instant…' : isConfirm ? 'Enregistrer' : 'Envoyer le lien'}
+            {busy ? 'Un instant…' : isConfirm ? (isInvite ? 'Créer mon mot de passe' : 'Enregistrer') : 'Envoyer le lien'}
           </button>
 
           <p className="text-center text-sm text-brown-800/70">

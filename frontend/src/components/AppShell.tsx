@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
+import AdminShell from './AdminShell';
 import Logo from './Logo';
 
 const STUDENT_NAV = [
@@ -16,15 +17,13 @@ const INSTRUCTOR_NAV = [
   { href: '/instructor/planning', label: 'Planning' },
   { href: '/instructor/availability', label: 'Disponibilités' },
 ];
-const SUPERVISOR_NAV = [
-  { href: '/instructor/planning', label: 'Planning' },
-  { href: '/instructor/performance', label: 'Performance' },
-];
-
 export default function AppShell({ title, children }: { title: string; children: ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const nav = user?.role === 'STUDENT' ? STUDENT_NAV : user?.role === 'INSTRUCTOR' ? INSTRUCTOR_NAV : SUPERVISOR_NAV;
+  if (user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') {
+    return <AdminShell title={title} wide>{children}</AdminShell>;
+  }
+  const nav = user?.role === 'STUDENT' ? STUDENT_NAV : INSTRUCTOR_NAV;
   const linkCls = (href: string) =>
     `px-3 py-2 rounded-full text-sm font-medium ${router.pathname === href ? 'bg-brown-700 text-cream-50' : 'text-brown-800 hover:bg-cream-200'}`;
 

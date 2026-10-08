@@ -54,6 +54,18 @@ class BookingFlowTests(APITestCase):
         self.assertEqual(self.student.user.role, 'STUDENT')
         self.assertTrue(hasattr(self.instructor, 'instructor_profile'))
 
+    def test_several_students_without_neph_can_register(self):
+        """Régression : unique=True sur un champ vide bloquait le 2e inscrit."""
+        for i in range(3):
+            r = self.client.post('/api/auth/register/', {
+                'email': f'eleve{i}@test.fr', 'password': 'testpass123', 'first_name': 'E', 'last_name': str(i)})
+            self.assertEqual(r.status_code, 201, r.content)
+        self.assertIsNone(StudentProfile.objects.get(user__email='eleve1@test.fr').neph_number)
+        p = StudentProfile.objects.get(user__email='eleve2@test.fr')
+        p.neph_number = '  '
+        p.save()
+        self.assertIsNone(p.neph_number)
+
     def test_free_windows_follow_availability(self):
         self.as_student()
         windows = self.free()

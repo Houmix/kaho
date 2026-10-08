@@ -1,6 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from core.admin_api import (
+    AdminApplicationViewSet, AdminInstructorViewSet, AdminOverviewView, AdminPackageViewSet, AdminRatingViewSet,
+    AdminSearchView, AdminStudentViewSet, InstructorApplicationPublicView,
+)
 from core.views import PasswordResetConfirmView, PasswordResetRequestView, RegisterView
 from core.viewsets import (
     UserViewSet, StudentProfileViewSet, InstructorViewSet, AvailabilityViewSet, UnavailabilityViewSet,
@@ -22,10 +26,18 @@ router.register(r'offers', OfferViewSet, basename='offer')
 router.register(r'packages', PackageViewSet, basename='package')
 router.register(r'documents', DocumentViewSet, basename='document')
 router.register(r'vehicle-logs', VehicleLogViewSet, basename='vehicle-log')
+router.register(r'admin/students', AdminStudentViewSet, basename='admin-student')
+router.register(r'admin/packages', AdminPackageViewSet, basename='admin-package')
+router.register(r'admin/instructors', AdminInstructorViewSet, basename='admin-instructor')
+router.register(r'admin/applications', AdminApplicationViewSet, basename='admin-application')
+router.register(r'admin/ratings', AdminRatingViewSet, basename='admin-rating')
 
 urlpatterns = [
     path('', include(router.urls)),
     path('auth/register/', RegisterView.as_view(), name='register'),
+    path('admin/overview/', AdminOverviewView.as_view(), name='admin_overview'),
+    path('admin/search/', AdminSearchView.as_view(), name='admin_search'),
+    path('instructor-applications/', InstructorApplicationPublicView.as_view(), name='instructor_application'),
     path('auth/password-reset/', PasswordResetRequestView.as_view(), name='password_reset'),
     path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

@@ -22,5 +22,5 @@ export function useRequireAuth(roles?: Role | Role[]): boolean {
 export function homeFor(role?: Role): string {
   if (role === 'STUDENT') return '/student/dashboard';
   if (role === 'INSTRUCTOR') return '/instructor/dashboard';
-  return '/instructor/planning';
+  return '/admin';
 }

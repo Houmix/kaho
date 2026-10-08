@@ -115,7 +115,7 @@ export default function Home() {
       <footer className="border-t border-cream-200 py-8">
         <div className="container flex flex-col md:flex-row items-center justify-between gap-3 text-sm text-brown-800/70">
           <Logo className="h-7" />
-          <p>© {new Date().getFullYear()} Kaho — Auto-école indépendante</p>
+          <p>© {new Date().getFullYear()} Kaho — Auto-école indépendante · <Link href="/devenir-moniteur" className="hover:underline text-brown-700">Devenir moniteur</Link></p>
         </div>
       </footer>
     </>

@@ -83,7 +83,10 @@ PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.Argon2PasswordHasher',
     'django.contrib.auth.hashers.PBKDF2PasswordHasher',
 ]
-PASSWORD_RESET_TIMEOUT = 60 * 60  # 1 h
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 72  # 72 h (sert aussi aux invitations des moniteurs)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+UPLOAD_MAX_BYTES = 5 * 1024 * 1024
+UPLOAD_ALLOWED_EXTENSIONS = ('pdf', 'jpg', 'jpeg', 'png')
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

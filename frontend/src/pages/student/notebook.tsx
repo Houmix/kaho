@@ -114,6 +114,7 @@ export default function Notebook() {
                     {l.assessments.map((a) => <span key={a.competency} className={`badge ${statusCls[a.status]}`}>{a.code} {a.status_display}</span>)}
                   </div>
                 )}
+                {l.rating?.reply && <p className="mt-3 text-sm border-l-2 border-caramel pl-3 text-brown-800/80"><strong>Réponse de l'école :</strong> {l.rating.reply}</p>}
               </article>
             ))}
           </div>

@@ -1,9 +1,17 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
-    User, StudentProfile, InstructorProfile, Availability, Unavailability, MeetingPoint, Slot,
+    User, StudentProfile, InstructorProfile, InstructorApplication, Availability, Unavailability, MeetingPoint, Slot,
     Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Document, VehicleLog,
 )
+
+
+@admin.register(InstructorApplication)
+class InstructorApplicationAdmin(admin.ModelAdmin):
+    list_display = ('last_name', 'first_name', 'email', 'phone', 'gearbox', 'status', 'created_at', 'reviewed_by')
+    list_filter = ('status', 'gearbox')
+    search_fields = ('first_name', 'last_name', 'email')
+    readonly_fields = ('created_at', 'reviewed_at', 'reviewed_by', 'created_user')
 
 
 @admin.register(Competency)
@@ -49,8 +57,9 @@ class UnavailabilityInline(admin.TabularInline):
 
 @admin.register(InstructorProfile)
 class InstructorProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'hourly_rate', 'is_bookable')
+    list_display = ('user', 'phone', 'gearbox', 'hourly_rate', 'is_bookable')
     list_editable = ('hourly_rate', 'is_bookable')
+    list_filter = ('gearbox', 'is_bookable')
     search_fields = ('user__email', 'user__first_name', 'user__last_name')
 
 
