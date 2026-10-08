@@ -5,7 +5,10 @@ import { useRouter } from 'next/router';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import Logo from '@/components/Logo';
-import { Offer, formatPrice } from '@/lib/offers';
+import { CATEGORY_LABELS, Offer, OfferCategory } from '@/lib/offers';
+import { homeFor } from '@/hooks/useRequireAuth';
+import OfferCard from '@/components/OfferCard';
+import OfferFinder from '@/components/OfferFinder';
 
 const features = [
   { title: 'Réservation simple', text: 'Choisissez un créneau et un point de rendez-vous en quelques secondes.' },
@@ -17,6 +20,9 @@ export default function Home() {
   const { isAuthenticated, user } = useAuth();
   const router = useRouter();
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [category, setCategory] = useState<OfferCategory | null>(null);
+  const categories = (Object.keys(CATEGORY_LABELS) as OfferCategory[]).filter((c) => offers.some((o) => o.category === c));
+  const visible = offers.filter((o) => !category || o.category === category);
 
   useEffect(() => {
     api.get('/offers/').then((r) => setOffers(r.data)).catch(() => setOffers([]));
@@ -24,7 +30,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    router.push(user?.role === 'INSTRUCTOR' ? '/instructor/planning' : '/student/dashboard');
+    router.push(homeFor(user?.role));
   }, [isAuthenticated, user, router]);
 
   if (isAuthenticated) return null;
@@ -61,8 +67,8 @@ export default function Home() {
           <img src="/hero.svg" alt="" className="w-full rounded-3xl shadow-warm" />
         </section>
 
-        <section className="bg-white border-y border-cream-200 py-16">
-          <div className="container">
+        <section className="container pb-4">
+          <div>
             <h2 className="text-3xl text-center mb-10">Pensé pour la route</h2>
             <div className="grid md:grid-cols-3 gap-6">
               {features.map((f) => (
@@ -75,24 +81,34 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="tarifs" className="container py-16">
-          <h2 className="text-3xl text-center mb-10">Tarifs</h2>
-          {offers.length === 0 ? (
-            <p className="text-center text-brown-800/60">Les offres seront bientôt disponibles.</p>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-6">
-              {offers.map((o) => (
-                <div key={o.id} className={`card text-center ${o.is_featured ? 'ring-2 ring-brown-500' : ''}`}>
-                  {o.is_featured && <span className="badge bg-brown-700 text-cream-50 mb-3">Le plus choisi</span>}
-                  <h3 className="text-xl mb-1">{o.name}</h3>
-                  <p className="text-4xl font-display text-brown-700 my-3">{formatPrice(o.price)}</p>
-                  <p className="text-brown-800/70">{o.hours} h de conduite</p>
-                  <p className="text-sm text-brown-800/60 mb-5">{o.description || `soit ${formatPrice(o.price_per_hour)} / heure`}</p>
-                  <Link href={`/signup?offer=${o.id}`} className={o.is_featured ? 'btn-primary w-full' : 'btn-secondary w-full'}>Choisir</Link>
-                </div>
-              ))}
-            </div>
-          )}
+        <section id="simulateur" className="container py-16">
+          <h2 className="text-3xl text-center mb-2">Quelle formule pour vous ?</h2>
+          <p className="text-center text-brown-800/70 mb-8">Trois questions, et nous vous proposons l'offre adaptée.</p>
+          <OfferFinder ctaHref={(o) => `/signup?offer=${o.id}`} />
+        </section>
+
+        <section id="tarifs" className="bg-white border-y border-cream-200 py-16">
+          <div className="container">
+            <h2 className="text-3xl text-center mb-6">Nos offres</h2>
+            {categories.length > 1 && (
+              <div className="flex flex-wrap justify-center gap-2 mb-8">
+                <button onClick={() => setCategory(null)} className={`badge !px-4 !py-2 ${category === null ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800 hover:bg-cream-200'}`}>Toutes</button>
+                {categories.map((c) => (
+                  <button key={c} onClick={() => setCategory(c)} className={`badge !px-4 !py-2 ${category === c ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800 hover:bg-cream-200'}`}>{CATEGORY_LABELS[c]}</button>
+                ))}
+              </div>
+            )}
+            {offers.length === 0 ? (
+              <p className="text-center text-brown-800/60">Les offres seront bientôt disponibles.</p>
+            ) : (
+              <div className="grid md:grid-cols-3 gap-6">
+                {visible.map((o) => (
+                  <OfferCard key={o.id} offer={o} highlight={o.is_featured}
+                    action={<Link href={`/signup?offer=${o.id}`} className={o.is_featured ? 'btn-primary w-full' : 'btn-secondary w-full'}>Choisir</Link>} />
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       </main>
 

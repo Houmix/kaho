@@ -1,62 +1,55 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
 import Link from 'next/link';
-import Head from 'next/head';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import Logo from '@/components/Logo';
-
-interface StudentProfile {
-  id: number;
-  purchased_hours: number;
-  used_hours: number;
-  remaining_hours: number;
-  ready_for_exam: boolean;
-  license_type: string;
-}
+import AppShell from '@/components/AppShell';
+import ProgressGauge from '@/components/ProgressGauge';
+import { Lesson, StudentProfile } from '@/lib/types';
 
 const links = [
   { href: '/student/reservation', title: 'Réserver une leçon', text: 'Créneaux disponibles et points de rendez-vous' },
-  { href: '/student/notebook', title: 'Livret numérique', text: 'Bilans de leçons et compétences validées' },
-  { href: '/student/documents', title: 'Documents', text: 'Pièce d’identité, attestation NEPH' },
-  { href: '/student/purchases', title: 'Acheter des heures', text: 'Packs et paiement sécurisé' },
+  { href: '/student/notebook', title: 'Livret d’apprentissage', text: 'Bilans de leçons et compétences validées' },
+  { href: '/student/purchases', title: 'Offres & heures', text: 'Formules, recharges et accès au code en ligne' },
 ];
 
 export default function StudentDashboard() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [toRate, setToRate] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { user, logout } = useAuth();
-  const ready = useRequireAuth();
-  const router = useRouter();
+  const { user } = useAuth();
+  const ready = useRequireAuth('STUDENT');
 
   useEffect(() => {
     if (!ready) return;
-    api.get('/student-profiles/my_profile/')
-      .then((r) => setProfile(r.data))
+    Promise.all([api.get('/student-profiles/my_profile/'), api.get('/lessons/to_rate/')])
+      .then(([p, t]) => { setProfile(p.data); setToRate(t.data); })
       .catch((e) => console.error(e))
       .finally(() => setIsLoading(false));
   }, [ready]);
 
-  if (isLoading) return <div className="flex justify-center items-center h-screen text-brown-500">Chargement…</div>;
-  if (!profile) return <div className="flex justify-center items-center h-screen text-brown-500">Profil introuvable</div>;
+  if (isLoading) return <AppShell title="Mon espace"><p className="text-brown-500">Chargement…</p></AppShell>;
+  if (!profile) return <AppShell title="Mon espace"><p className="text-brown-500">Profil introuvable</p></AppShell>;
 
   const progress = Math.min((profile.used_hours / (profile.purchased_hours || 1)) * 100, 100);
 
   return (
-    <>
-      <Head><title>Mon espace — Kaho</title></Head>
-      <header className="bg-white border-b border-cream-200">
-        <div className="container flex items-center justify-between py-3">
-          <Logo />
-          <button onClick={() => { logout(); router.push('/login'); }} className="btn-secondary">Déconnexion</button>
-        </div>
-      </header>
-
-      <main className="container py-8">
+    <AppShell title="Mon espace">
         <h1 className="text-3xl mb-6">Bonjour, {user?.first_name} 👋</h1>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
+        {toRate.length > 0 && (
+          <Link href="/student/notebook" className="card block mb-6 border-caramel bg-brown-50 hover:border-brown-300">
+            <p className="font-semibold">Comment s'est passée votre dernière leçon ?</p>
+            <p className="text-sm text-brown-800/70">{toRate.length} leçon{toRate.length > 1 ? 's' : ''} à noter — votre avis aide votre moniteur à s'améliorer.</p>
+          </Link>
+        )}
+
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
+          <div className="card">
+            <h2 className="text-xl mb-4">Compétences</h2>
+            <ProgressGauge progress={profile.competency_progress} compact />
+            <Link href="/student/notebook" className="text-sm text-brown-700 hover:underline mt-3 inline-block">Voir le livret →</Link>
+          </div>
           <div className="card">
             <h2 className="text-xl mb-4">Votre progression</h2>
             <div className="flex justify-between text-sm mb-2">
@@ -66,7 +59,11 @@ export default function StudentDashboard() {
             <div className="w-full bg-cream-200 rounded-full h-2.5">
               <div className="bg-brown-700 h-2.5 rounded-full transition-all" style={{ width: `${progress}%` }} />
             </div>
-            <p className="mt-3 text-brown-800/70">Il vous reste <strong className="text-brown-900">{profile.remaining_hours.toFixed(1)} h</strong></p>
+            <p className="mt-3 text-brown-800/70">
+              Il vous reste <strong className="text-brown-900">{profile.remaining_hours.toFixed(1)} h</strong>
+              {profile.reserved_hours > 0 && <span className="text-sm"> dont {profile.reserved_hours.toFixed(1)} h déjà réservées</span>}
+            </p>
+            {profile.referent_instructor_name && <p className="text-sm text-brown-800/60 mt-1">Moniteur référent : {profile.referent_instructor_name}</p>}
           </div>
 
           <div className="card">
@@ -96,7 +93,6 @@ export default function StudentDashboard() {
             </Link>
           ))}
         </div>
-      </main>
-    </>
+    </AppShell>
   );
 }

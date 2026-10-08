@@ -2,15 +2,25 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuthStore, User } from './useAuth';
 
-// Returns true once the session is restored AND the user is allowed. Redirects to /login otherwise.
-export function useRequireAuth(role?: User['role']): boolean {
+type Role = User['role'];
+export const STAFF_ROLES: Role[] = ['INSTRUCTOR', 'SUPERVISOR', 'ADMIN'];
+
+// Returns true once the session is restored AND the user has one of the allowed roles. Redirects to /login otherwise.
+export function useRequireAuth(roles?: Role | Role[]): boolean {
   const { hasHydrated, isAuthenticated, user } = useAuthStore();
   const router = useRouter();
-  const allowed = hasHydrated && isAuthenticated && (!role || user?.role === role);
+  const allowedRoles = roles === undefined ? null : Array.isArray(roles) ? roles : [roles];
+  const allowed = hasHydrated && isAuthenticated && (!allowedRoles || (!!user && allowedRoles.includes(user.role)));
 
   useEffect(() => {
     if (hasHydrated && !allowed) router.replace('/login');
   }, [hasHydrated, allowed, router]);
 
   return allowed;
+}
+
+export function homeFor(role?: Role): string {
+  if (role === 'STUDENT') return '/student/dashboard';
+  if (role === 'INSTRUCTOR') return '/instructor/dashboard';
+  return '/instructor/planning';
 }

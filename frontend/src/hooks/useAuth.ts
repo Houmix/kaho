@@ -6,7 +6,7 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'INSTRUCTOR' | 'STUDENT';
+  role: 'STUDENT' | 'INSTRUCTOR' | 'SUPERVISOR' | 'ADMIN';
 }
 
 interface AuthState {

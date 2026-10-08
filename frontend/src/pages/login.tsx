@@ -5,6 +5,7 @@ import Head from 'next/head';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import Logo from '@/components/Logo';
+import { homeFor } from '@/hooks/useRequireAuth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -23,7 +24,7 @@ export default function Login() {
       setToken(data.access, data.refresh);
       const me = await api.get('/users/me/');
       setUser(me.data);
-      router.push(me.data.role === 'INSTRUCTOR' ? '/instructor/planning' : '/student/dashboard');
+      router.push(homeFor(me.data.role));
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Email ou mot de passe incorrect');
     } finally {
@@ -66,6 +67,10 @@ export default function Login() {
             <button type="submit" disabled={isLoading} className="btn-primary w-full disabled:opacity-60">
               {isLoading ? 'Connexion…' : 'Se connecter'}
             </button>
+
+            <p className="text-center text-sm">
+              <Link href="/reset-password" className="text-brown-700 hover:underline">Mot de passe oublié ?</Link>
+            </p>
 
             <p className="text-center text-sm text-brown-800/70">
               Pas encore de compte ?{' '}

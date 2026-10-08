@@ -79,6 +79,12 @@ DATABASES = {
 # Auth User Model
 AUTH_USER_MODEL = 'core.User'
 
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+]
+PASSWORD_RESET_TIMEOUT = 60 * 60  # 1 h
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -134,6 +140,13 @@ SIMPLE_JWT = {
     'SIGNING_KEY': SECRET_KEY,
 }
 
+# Frontend (liens dans les emails)
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+
+# Réservation
+BOOKING_MIN_NOTICE_HOURS = config('BOOKING_MIN_NOTICE_HOURS', default=24, cast=int)
+BOOKING_CANCEL_DEADLINE_HOURS = config('BOOKING_CANCEL_DEADLINE_HOURS', default=48, cast=int)
+
 # CORS
 CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000', cast=Csv())
 
@@ -144,6 +157,8 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'Europe/Paris'
+# Sans Redis configuré, les tâches s'exécutent inline (dev local, ou prod sans worker)
+CELERY_TASK_ALWAYS_EAGER = not config('REDIS_URL', default='')
 
 # Email Configuration (SendGrid — appelé directement via l'API dans core/tasks.py)
 SENDGRID_API_KEY = config('SENDGRID_API_KEY', default='')

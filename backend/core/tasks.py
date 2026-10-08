@@ -95,6 +95,62 @@ def send_sms_reminder(phone, student_name, slot_date, slot_time):
         print(f"Error sending SMS reminder: {e}")
 
 
+def _fr_date(d):
+    from django.utils import translation
+    from django.utils.formats import date_format
+    with translation.override('fr'):
+        return date_format(d, 'l j F Y')
+
+
+def _send_email(to_email, subject, html):
+    """Envoi via SendGrid ; sans clé API, affiche le mail en console (dev)."""
+    api_key = config('SENDGRID_API_KEY', default='')
+    sender = config('DEFAULT_FROM_EMAIL', default='noreply@kaho.app')
+    if not api_key:
+        print(f"[email non envoyé — SENDGRID_API_KEY absente] to={to_email} subject={subject}\n{html}")
+        return
+    try:
+        SendGridAPIClient(api_key).send(Mail(from_email=sender, to_emails=to_email, subject=subject, html_content=html))
+    except Exception as e:
+        print(f"Error sending email: {e}")
+
+
+@shared_task
+def send_password_reset_email(email, link):
+    _send_email(
+        email,
+        'Réinitialisation de votre mot de passe — Kaho',
+        f"""<p>Bonjour,</p>
+        <p>Pour choisir un nouveau mot de passe, cliquez sur ce lien (valable 1 heure) :</p>
+        <p><a href="{link}">{link}</a></p>
+        <p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>""",
+    )
+
+
+@shared_task
+def send_booking_confirmation(slot_id):
+    from .models import Slot
+    try:
+        slot = Slot.objects.select_related('student__user', 'instructor', 'meeting_point').get(pk=slot_id)
+    except Slot.DoesNotExist:
+        return
+    if not slot.student:
+        return
+    _send_email(
+        slot.student.user.email,
+        f"Leçon confirmée le {slot.date:%d/%m/%Y} à {slot.start_time:%H:%M}",
+        f"""<p>Bonjour {slot.student.user.first_name},</p>
+        <p>Votre leçon est confirmée :</p>
+        <ul>
+          <li><strong>Date :</strong> {_fr_date(slot.date)}</li>
+          <li><strong>Heure :</strong> {slot.start_time:%H:%M} – {slot.end_time:%H:%M}</li>
+          <li><strong>Moniteur :</strong> {slot.instructor.get_full_name()}</li>
+          <li><strong>Lieu :</strong> {slot.meeting_point.name} — {slot.meeting_point.address}</li>
+        </ul>
+        <p>Annulation possible jusqu'à 48 h avant depuis votre espace.</p>""",
+    )
+
+
 @shared_task
 def sync_student_hours():
     """Synchroniser les heures utilisées et achhetées"""
