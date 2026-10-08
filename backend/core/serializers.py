@@ -79,10 +79,46 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
 
+class TeamMemberSerializer(serializers.ModelSerializer):
+    """Comptes du back-office (gérant, gestionnaires, superviseurs)."""
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    role_display = serializers.CharField(source='get_role_display', read_only=True)
+    has_password = serializers.SerializerMethodField()
+    last_login = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'role_display', 'is_active', 'has_password', 'last_login', 'created_at')
+        read_only_fields = ('id', 'email', 'created_at')
+
+    def get_has_password(self, obj):
+        return obj.has_usable_password()
+
+
+class TeamInviteSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=150)
+    last_name = serializers.CharField(max_length=150)
+    role = serializers.ChoiceField(choices=['ADMIN', 'SUPERVISOR', 'OWNER'], default='ADMIN')
+
+    def validate_email(self, value):
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Un compte existe déjà avec cet email.")
+        return value.lower()
+
+    def create(self, validated_data):
+        user = User.objects.create_user(username=validated_data['email'], **validated_data)
+        user.set_unusable_password()
+        user.is_staff = validated_data['role'] == 'OWNER'
+        user.save(update_fields=['password', 'is_staff'])
+        return user
+
+
 # ---------- Profils ----------
 
 class StudentProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
     remaining_hours = serializers.FloatField(read_only=True)
     reserved_hours = serializers.FloatField(read_only=True)
     bookable_hours = serializers.FloatField(read_only=True)
@@ -94,14 +130,14 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProfile
         fields = (
-            'id', 'user', 'neph_number', 'phone', 'purchased_hours', 'used_hours',
+            'id', 'user', 'status', 'status_display', 'neph_number', 'phone', 'purchased_hours', 'used_hours',
             'remaining_hours', 'reserved_hours', 'bookable_hours',
             'lms_access', 'lms_access_until', 'has_lms_access',
             'referent_instructor', 'referent_instructor_name', 'emergency_contact', 'emergency_phone',
             'license_type', 'ready_for_exam', 'competency_progress', 'dossier', 'created_at', 'updated_at',
         )
         read_only_fields = (
-            'id', 'created_at', 'updated_at', 'used_hours', 'purchased_hours', 'referent_instructor',
+            'id', 'status', 'created_at', 'updated_at', 'used_hours', 'purchased_hours', 'referent_instructor',
             'lms_access', 'lms_access_until',
         )
 
@@ -127,7 +163,7 @@ class InstructorProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InstructorProfile
-        fields = ('id', 'user', 'hourly_rate', 'phone', 'gearbox', 'gearbox_display', 'vehicle', 'bio', 'is_bookable')
+        fields = ('id', 'user', 'hourly_rate', 'phone', 'gearbox', 'gearbox_display', 'vehicle', 'zones', 'bio', 'is_bookable')
         read_only_fields = ('id', 'hourly_rate')
 
     def get_user(self, obj):
@@ -250,9 +286,14 @@ class AvailabilitySerializer(serializers.ModelSerializer):
 
 
 class UnavailabilitySerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
+    reviewed_by_name = serializers.CharField(source='reviewed_by.get_full_name', read_only=True, default=None)
+
     class Meta:
         model = Unavailability
-        fields = ('id', 'start', 'end', 'reason')
+        fields = ('id', 'instructor', 'instructor_name', 'start', 'end', 'reason', 'status', 'status_display', 'reviewed_by_name', 'reviewed_at', 'review_note')
+        read_only_fields = ('id', 'instructor', 'status', 'reviewed_by_name', 'reviewed_at', 'review_note')
 
     def validate(self, data):
         if data['end'] <= data['start']:
@@ -422,7 +463,9 @@ class PackageSerializer(serializers.ModelSerializer):
     offer_name = serializers.CharField(source='offer.name', read_only=True)
     offer_category = serializers.CharField(source='offer.category', read_only=True)
     includes_lms = serializers.BooleanField(source='offer.includes_lms', read_only=True)
+    display_label = serializers.CharField(read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
     invoice_id = serializers.IntegerField(source='invoice.id', read_only=True, default=None)
     invoice_number = serializers.CharField(source='invoice.number', read_only=True, default=None)
 
@@ -435,11 +478,11 @@ class PackageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Package
         fields = (
-            'id', 'student', 'student_name', 'offer', 'offer_name', 'offer_category', 'includes_lms',
-            'hours_purchased', 'amount_paid', 'status', 'status_display', 'paid_at', 'expires_at', 'note',
-            'invoice_id', 'invoice_number', 'created_at', 'updated_at',
+            'id', 'student', 'student_name', 'offer', 'offer_name', 'offer_category', 'includes_lms', 'label', 'display_label',
+            'hours_purchased', 'amount_paid', 'status', 'status_display', 'payment_method', 'payment_method_display',
+            'stripe_checkout_url', 'paid_at', 'expires_at', 'note', 'invoice_id', 'invoice_number', 'created_at', 'updated_at',
         )
-        read_only_fields = ('id', 'student', 'hours_purchased', 'amount_paid', 'status', 'paid_at', 'expires_at', 'note', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'student', 'label', 'hours_purchased', 'amount_paid', 'status', 'payment_method', 'stripe_checkout_url', 'paid_at', 'expires_at', 'note', 'created_at', 'updated_at')
 
 
 # ---------- Divers ----------

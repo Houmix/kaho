@@ -5,7 +5,7 @@ from core.models import User
 
 
 class Command(BaseCommand):
-    help = "Crée (ou met à jour) le compte administrateur à partir de ADMIN_EMAIL / ADMIN_PASSWORD. Idempotent."
+    help = "Crée (ou met à jour) le compte gérant (super admin) à partir de ADMIN_EMAIL / ADMIN_PASSWORD. Idempotent."
 
     def handle(self, *args, **options):
         email = config('ADMIN_EMAIL', default='').strip().lower()
@@ -21,7 +21,7 @@ class Command(BaseCommand):
                 'last_name': config('ADMIN_LAST_NAME', default='Kaho'),
             },
         )
-        user.role = 'ADMIN'
+        user.role = 'OWNER'  # super admin (gérant)
         user.is_staff = True
         user.is_superuser = True
         user.is_active = True

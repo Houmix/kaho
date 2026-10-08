@@ -22,7 +22,7 @@ const INSTRUCTOR_NAV = [
 export default function AppShell({ title, children }: { title: string; children: ReactNode }) {
   const { user, logout } = useAuth();
   const router = useRouter();
-  if (user?.role === 'ADMIN' || user?.role === 'SUPERVISOR') {
+  if (user?.role === 'ADMIN' || user?.role === 'SUPERVISOR' || user?.role === 'OWNER') {
     return <AdminShell title={title} wide>{children}</AdminShell>;
   }
   const nav = user?.role === 'STUDENT' ? STUDENT_NAV : INSTRUCTOR_NAV;

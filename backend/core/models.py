@@ -20,9 +20,13 @@ class User(AbstractUser):
         ('STUDENT', 'Élève'),
         ('INSTRUCTOR', 'Moniteur / Formateur'),
         ('SUPERVISOR', 'Superviseur / Bénévole'),
-        ('ADMIN', 'Administrateur'),
+        ('ADMIN', "Administrateur / gestionnaire d'exploitation"),
+        ('OWNER', 'Super admin (gérant)'),
     ]
-    STAFF_ROLES = ('INSTRUCTOR', 'SUPERVISOR', 'ADMIN')
+    STAFF_ROLES = ('INSTRUCTOR', 'SUPERVISOR', 'ADMIN', 'OWNER')
+    # Rôles ayant accès au back-office ; OWNER seul accède à la trésorerie globale et à la gestion des admins
+    BACKOFFICE_ROLES = ('SUPERVISOR', 'ADMIN', 'OWNER')
+    TEAM_ROLES = ('SUPERVISOR', 'ADMIN', 'OWNER')
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='STUDENT')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -40,8 +44,18 @@ class StudentProfile(models.Model):
         ('AUTO', 'Automatique'),
         ('MANUAL', 'Manuelle'),
     ]
+    STATUS_CHOICES = [
+        ('INCOMPLETE', 'Dossier incomplet'),
+        ('REGISTERED', 'Inscrit / NEPH en attente'),
+        ('CODE', 'Code en cours'),
+        ('DRIVING', 'Prêt pour la conduite'),
+        ('EXAM', 'Examen réservé'),
+        ('LICENSED', 'Permis obtenu'),
+        ('ARCHIVED', 'Archivé'),
+    ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
+    status = models.CharField("Statut du parcours", max_length=12, choices=STATUS_CHOICES, default='INCOMPLETE')
     # NULL (et non '') quand absent : unique=True n'accepte qu'une seule chaîne vide
     neph_number = models.CharField("N° NEPH", max_length=50, unique=True, null=True, blank=True)
     phone = models.CharField("Téléphone mobile (SMS)", max_length=20, blank=True)
@@ -111,6 +125,7 @@ class InstructorProfile(models.Model):
     phone = models.CharField("Téléphone", max_length=20, blank=True)
     gearbox = models.CharField("Boîte enseignée", max_length=10, choices=GEARBOX_CHOICES, default='BOTH')
     vehicle = models.CharField("Véhicule", max_length=100, blank=True)
+    zones = models.CharField("Zones de prise en charge", max_length=255, blank=True, help_text="Villes / quartiers, séparés par des virgules")
     bio = models.TextField(blank=True)
     is_bookable = models.BooleanField("Réservable par les élèves", default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -144,10 +159,17 @@ class Availability(models.Model):
 
 
 class Unavailability(models.Model):
+    """Absence / congé / arrêt. Une demande du moniteur est PENDING (elle bloque déjà le planning) jusqu'à validation."""
+    STATUS_CHOICES = [('PENDING', 'À valider'), ('APPROVED', 'Validée'), ('REJECTED', 'Refusée')]
+
     instructor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='unavailabilities', limit_choices_to={'role': 'INSTRUCTOR'})
     start = models.DateTimeField()
     end = models.DateTimeField()
     reason = models.CharField(max_length=120, blank=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='APPROVED')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.CharField(max_length=255, blank=True)
 
     class Meta:
         ordering = ['-start']
@@ -375,12 +397,20 @@ class Package(models.Model):
         ('COMPLETED', 'Payé — accès et heures crédités'),
         ('FAILED', 'Annulé'),
     ]
+    METHOD_CHOICES = [
+        ('', 'Non précisé'), ('STRIPE', 'Carte bancaire (lien de paiement)'), ('CASH', 'Espèces'), ('CHECK', 'Chèque'),
+        ('TRANSFER', 'Virement'), ('CPF', 'CPF'), ('FREE', 'Offert / régularisation'),
+    ]
 
     student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='packages')
     offer = models.ForeignKey(Offer, on_delete=models.SET_NULL, null=True, blank=True, related_name='packages')
+    label = models.CharField("Libellé (si pas d'offre)", max_length=150, blank=True)
     hours_purchased = models.FloatField(validators=[MinValueValidator(0)])
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    payment_method = models.CharField("Mode de règlement", max_length=10, choices=METHOD_CHOICES, blank=True, default='')
     stripe_payment_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    stripe_session_id = models.CharField(max_length=120, blank=True, default='')
+    stripe_checkout_url = models.URLField("Lien de paiement", max_length=500, blank=True, default='')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     paid_at = models.DateTimeField("Payé le", null=True, blank=True)
     expires_at = models.DateField("Fin de validité", null=True, blank=True)
@@ -409,9 +439,14 @@ class Package(models.Model):
         if granted:
             from .tasks import send_payment_confirmation
             send_payment_confirmation.delay(self.pk)
-            label = self.offer.name if self.offer else f"{self.hours_purchased:g} h"
+            label = self.offer.name if self.offer else (self.label or f"{self.hours_purchased:g} h")
+            method = f" · {self.get_payment_method_display()}" if self.payment_method else ''
             log_activity('PAYMENT' if self.amount_paid else 'HOURS_ADDED',
-                         f"{self.student.user.get_full_name()} — {label} ({self.amount_paid} €) validé", student=self.student)
+                         f"{self.student.user.get_full_name()} — {label} ({self.amount_paid} €{method}) validé", student=self.student)
+
+    @property
+    def display_label(self):
+        return self.offer.name if self.offer else (self.label or (f"Heures de conduite ({self.hours_purchased:g} h)" if self.hours_purchased else 'Règlement'))
 
     def _grant(self):
         today = timezone.localdate()
@@ -498,7 +533,7 @@ class Invoice(models.Model):
             seq.last += 1
             seq.save(update_fields=['last'])
             number = f"{settings.INVOICE_PREFIX}-{today.year}-{seq.last:04d}"
-        label = package.offer.name if package.offer else f"Heures de conduite ({package.hours_purchased:g} h)"
+        label = package.display_label
         return cls.objects.create(
             number=number, package=package, student=package.student, label=label,
             quantity_hours=package.hours_purchased, amount_ttc=package.amount_paid,
@@ -514,13 +549,17 @@ def document_upload_to(instance, filename):
 
 class Document(models.Model):
     TYPE_CHOICES = [
-        ('IDENTITY', 'Pièce d\'identité'),
+        ('IDENTITY', 'Pièce d\'identité (CNI / passeport)'),
+        ('PHOTO', 'Photo-signature numérique (ePhoto)'),
+        ('PROOF_ADDRESS', 'Justificatif de domicile'),
+        ('JDC', 'Attestation JDC / recensement'),
         ('NEPH_CERTIFICATE', 'Attestation NEPH'),
-        ('CONTRACT', 'Contrat de formation'),
+        ('CONTRACT', 'Contrat de formation signé'),
     ]
 
     STATUS_CHOICES = [('PENDING', 'À vérifier'), ('VERIFIED', 'Validé'), ('REJECTED', 'Refusé')]
-    REQUIRED_TYPES = ('IDENTITY', 'NEPH_CERTIFICATE', 'CONTRACT')
+    REQUIRED_TYPES = ('IDENTITY', 'PHOTO', 'PROOF_ADDRESS', 'NEPH_CERTIFICATE', 'CONTRACT')
+    OPTIONAL_TYPES = ('JDC',)
 
     student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='documents')
     document_type = models.CharField(max_length=50, choices=TYPE_CHOICES)
@@ -546,10 +585,14 @@ class Document(models.Model):
     def dossier(cls, student):
         """Synthèse du dossier administratif : par pièce requise, statut courant."""
         docs = {d.document_type: d for d in student.documents.all()}
-        items = [{'type': t, 'label': dict(cls.TYPE_CHOICES)[t], 'status': docs[t].status if t in docs else 'MISSING',
-                  'note': docs[t].review_note if t in docs else ''} for t in cls.REQUIRED_TYPES]
-        return {'items': items, 'complete': all(i['status'] == 'VERIFIED' for i in items),
-                'pending': sum(1 for i in items if i['status'] == 'PENDING'), 'missing': sum(1 for i in items if i['status'] in ('MISSING', 'REJECTED'))}
+        labels = dict(cls.TYPE_CHOICES)
+        items = [{'type': t, 'label': labels[t], 'status': docs[t].status if t in docs else 'MISSING',
+                  'note': docs[t].review_note if t in docs else '', 'required': True} for t in cls.REQUIRED_TYPES]
+        items += [{'type': t, 'label': labels[t], 'status': docs[t].status if t in docs else 'MISSING',
+                   'note': docs[t].review_note if t in docs else '', 'required': False} for t in cls.OPTIONAL_TYPES]
+        required = [i for i in items if i['required']]
+        return {'items': items, 'complete': all(i['status'] == 'VERIFIED' for i in required),
+                'pending': sum(1 for i in items if i['status'] == 'PENDING'), 'missing': sum(1 for i in required if i['status'] in ('MISSING', 'REJECTED'))}
 
 
 class ActivityLog(models.Model):
@@ -559,6 +602,8 @@ class ActivityLog(models.Model):
         ('NO_SHOW', 'Absence'), ('REFUND', 'Re-crédit'), ('SLOT_MOVED', 'Créneau déplacé'),
         ('PAYMENT', 'Paiement'), ('HOURS_ADDED', 'Heures ajoutées'), ('APPLICATION', 'Candidature'),
         ('INSTRUCTOR', 'Moniteur'), ('LESSON', 'Bilan'), ('REMINDERS', 'Rappels'), ('DOCUMENT', 'Document'),
+        ('STATUS', 'Statut élève'), ('MESSAGE', 'Message envoyé'), ('ABSENCE', 'Absence moniteur'), ('PLANNING', 'Planning'),
+        ('TEAM', 'Équipe admin'), ('CONTRACT', 'Contrat'), ('LMS', 'Accès code'), ('PAYMENT_LINK', 'Lien de paiement'),
     ]
     kind = models.CharField(max_length=20, choices=KINDS)
     message = models.CharField(max_length=300)

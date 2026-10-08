@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import { useAuthStore, User } from './useAuth';
 
 type Role = User['role'];
-export const STAFF_ROLES: Role[] = ['INSTRUCTOR', 'SUPERVISOR', 'ADMIN'];
+export const STAFF_ROLES: Role[] = ['INSTRUCTOR', 'SUPERVISOR', 'ADMIN', 'OWNER'];
+export const BACKOFFICE: Role[] = ['SUPERVISOR', 'ADMIN', 'OWNER'];
 
 // Returns true once the session is restored AND the user has one of the allowed roles. Redirects to /login otherwise.
 export function useRequireAuth(roles?: Role | Role[]): boolean {

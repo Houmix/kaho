@@ -40,7 +40,7 @@ function InvoiceTable({ items }: { items: Invoice[] }) {
 }
 
 export default function AdminSales() {
-  const ready = useRequireAuth(['SUPERVISOR', 'ADMIN']);
+  const ready = useRequireAuth('OWNER');
   const [tab, setTab] = useState<Tab>('overview');
   const [sales, setSales] = useState<SalesData | null>(null);
   const [invoices, setInvoices] = useState<Paginated<Invoice> | null>(null);

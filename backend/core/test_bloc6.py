@@ -11,7 +11,7 @@ from .models import Invoice, Lesson, MeetingPoint, Offer, Package, Slot, User
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True, INVOICE_PREFIX='TEST', INVOICE_VAT_RATE=20.0)
 class InvoiceAndPayrollTests(APITestCase):
     def setUp(self):
-        self.admin = User.objects.create_user(username='a@kaho.app', email='a@kaho.app', password='pass12345', first_name='Al', last_name='Admin', role='ADMIN')
+        self.admin = User.objects.create_user(username='a@kaho.app', email='a@kaho.app', password='pass12345', first_name='Al', last_name='Admin', role='OWNER')
         self.instructor = User.objects.create_user(username='m@kaho.app', email='m@kaho.app', password='pass12345', first_name='Claire', last_name='Martin', role='INSTRUCTOR')
         self.instructor.instructor_profile.hourly_rate = 30
         self.instructor.instructor_profile.save()

@@ -70,7 +70,8 @@ export default function AvailabilityPage() {
         </section>
 
         <section className="card">
-          <h2 className="text-xl mb-3">Absences & congés</h2>
+          <h2 className="text-xl mb-1">Absences & congés</h2>
+          <p className="text-xs text-brown-800/60 mb-3">Chaque demande bloque immédiatement vos créneaux et est soumise à validation de l'école (vous êtes prévenu par email).</p>
           <form onSubmit={addAbsence} className="space-y-2 mb-4">
             <div className="grid grid-cols-2 gap-2">
               <label className="block"><span className="text-xs text-brown-800/70">Du</span>
@@ -88,6 +89,8 @@ export default function AvailabilityPage() {
                   <span>
                     {new Date(u.start).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })} → {new Date(u.end).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
                     {u.reason && <span className="text-brown-800/60"> · {u.reason}</span>}
+                    <span className={`badge ml-2 ${u.status === 'APPROVED' ? 'bg-brown-700 text-cream-50' : u.status === 'REJECTED' ? 'bg-red-100 text-red-700' : 'bg-caramel text-brown-900'}`}>{u.status_display}</span>
+                    {u.status === 'REJECTED' && u.review_note && <span className="text-red-700 text-xs"> {u.review_note}</span>}
                   </span>
                   <button onClick={() => remove(`/unavailabilities/${u.id}/`)} className="text-brown-800/50 hover:text-red-600">Supprimer</button>
                 </li>

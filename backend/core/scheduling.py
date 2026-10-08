@@ -29,7 +29,8 @@ def busy_periods(instructor: User, day: date):
         (_aware(day, s.start_time), _aware(day, s.end_time))
         for s in Slot.objects.filter(instructor=instructor, date=day).exclude(status='CANCELLED')
     ]
-    for u in Unavailability.objects.filter(instructor=instructor, start__lt=day_end, end__gt=day_start):
+    # Une demande d'absence en attente bloque déjà le planning ; seule une demande refusée ne compte pas
+    for u in Unavailability.objects.filter(instructor=instructor, start__lt=day_end, end__gt=day_start).exclude(status='REJECTED'):
         periods.append((max(u.start, day_start), min(u.end, day_end)))
     return periods
 

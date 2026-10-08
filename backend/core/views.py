@@ -72,3 +72,14 @@ class PasswordResetConfirmView(APIView):
         user.set_password(s.validated_data['new_password'])
         user.save(update_fields=['password'])
         return Response(_tokens_for(user))
+
+
+class StripeWebhookView(APIView):
+    """Réception des événements Stripe (checkout.session.completed) : valide l'achat et crédite l'élève."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        from .payments import handle_webhook
+        ok, message = handle_webhook(request.body, request.headers.get('Stripe-Signature', ''))
+        return Response({'detail': message}, status=200 if ok else 400)

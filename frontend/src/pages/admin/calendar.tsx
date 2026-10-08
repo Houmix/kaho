@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { BACKOFFICE, useRequireAuth } from '@/hooks/useRequireAuth';
 import AdminShell from '@/components/AdminShell';
 import Calendar, { View, addDays, iso, startOfWeek } from '@/components/Calendar';
 import { CalendarData } from '@/lib/admin';
@@ -20,7 +20,7 @@ function rangeFor(view: View, anchor: Date): [string, string] {
 }
 
 export default function AdminCalendar() {
-  const ready = useRequireAuth(['SUPERVISOR', 'ADMIN']);
+  const ready = useRequireAuth(BACKOFFICE);
   const [view, setView] = useState<View>('week');
   const [anchor, setAnchor] = useState(() => new Date());
   const [data, setData] = useState<CalendarData | null>(null);

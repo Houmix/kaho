@@ -34,7 +34,9 @@ export default function Purchases() {
     if (!ready) return;
     api.get('/offers/').then((r) => setOffers(r.data));
     load();
-  }, [ready]);
+    if (router.query.paid === '1') setMessage('Paiement reçu, merci ! Vos heures et accès sont crédités (ou le seront dans quelques instants).');
+    if (router.query.cancelled === '1') setMessage('Paiement annulé. Votre lien reste valable 24 h, ou contactez votre école.');
+  }, [ready, router.query.paid, router.query.cancelled]);
 
   useEffect(() => {
     if (preselected && offers.length) {
@@ -121,11 +123,11 @@ export default function Purchases() {
               {packages.map((p) => (
                 <tr key={p.id} className="border-t border-cream-200">
                   <td className="py-3 px-4">{new Date(p.created_at).toLocaleDateString('fr-FR')}</td>
-                  <td className="py-3 px-4">{p.offer_name || '—'}</td>
+                  <td className="py-3 px-4">{p.display_label}</td>
                   <td className="py-3 px-4">{[p.hours_purchased > 0 ? `${p.hours_purchased} h` : null, p.includes_lms ? 'Code en ligne' : null].filter(Boolean).join(' + ') || '—'}</td>
                   <td className="py-3 px-4">{formatPrice(p.amount_paid)}</td>
                   <td className="py-3 px-4">{p.expires_at ? frDate(p.expires_at, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
-                  <td className="py-3 px-4"><span className={`badge ${statusCls[p.status]}`}>{p.status_display}</span></td>
+                  <td className="py-3 px-4"><span className={`badge ${statusCls[p.status]}`}>{p.status_display}</span>{p.status === 'PENDING' && p.stripe_checkout_url && <><br /><a href={p.stripe_checkout_url} className="btn-primary !py-1 !px-3 text-xs mt-1 inline-block">Payer en ligne</a></>}</td>
                   <td className="py-3 px-4">{p.invoice_id && p.invoice_number ? <PdfLink invoiceId={p.invoice_id} number={p.invoice_number} /> : <span className="text-brown-800/40">—</span>}</td>
                 </tr>
               ))}

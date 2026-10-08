@@ -245,3 +245,81 @@ def send_payment_confirmation(package_id):
         <ul>{''.join(content)}<li><strong>Montant :</strong> {package.amount_paid} €</li></ul>
         <p>Vous pouvez dès maintenant réserver vos leçons depuis votre espace.</p>"""),
     )
+
+
+@shared_task
+def send_payment_link(package_id, channel='email'):
+    """Lien de paiement sécurisé envoyé par email et/ou SMS (channel: email | sms | both)."""
+    from .models import Package
+    try:
+        package = Package.objects.select_related('student__user', 'offer').get(id=package_id)
+    except Package.DoesNotExist:
+        return
+    user, link = package.student.user, package.stripe_checkout_url
+    if not link:
+        return
+    if channel in ('email', 'both'):
+        safe = escape(link)
+        _send_email(
+            user.email,
+            f"Votre lien de paiement — {package.display_label}",
+            _layout('Règlement en ligne', f"""
+            <p>Bonjour {user.first_name},</p>
+            <p>Voici votre lien de paiement sécurisé pour « {package.display_label} » ({package.amount_paid} €) :</p>
+            <p><a href="{safe}" style="display:inline-block;background:#5C3D2E;color:#FBF8F3;padding:10px 18px;border-radius:999px;text-decoration:none">Payer {package.amount_paid} € en ligne</a></p>
+            <p style="font-size:13px;color:#8B5E3C">Ou copiez ce lien (valable 24 h) : {safe}</p>
+            <p>Vos heures et accès sont crédités automatiquement dès le paiement confirmé.</p>"""),
+        )
+    if channel in ('sms', 'both'):
+        _send_sms(package.student.phone, f"Kaho : votre lien de paiement ({package.amount_paid} EUR, {package.display_label}) : {link}")
+
+
+@shared_task
+def send_bulk_message(user_ids, subject, body, channel='email'):
+    """Message libre envoyé par le back-office à une sélection d'élèves (email, SMS ou les deux)."""
+    from .models import User
+    sent = 0
+    for u in User.objects.filter(id__in=user_ids, is_active=True).select_related('student_profile'):
+        text = body.replace('{prenom}', u.first_name).replace('{nom}', u.last_name)
+        if channel in ('email', 'both'):
+            paragraphs = ''.join(f"<p>{escape(p)}</p>" for p in text.split('\n') if p.strip())
+            _send_email(u.email, subject, _layout(escape(subject), paragraphs))
+            sent += 1
+        if channel in ('sms', 'both'):
+            phone = getattr(getattr(u, 'student_profile', None), 'phone', '') or getattr(getattr(u, 'instructor_profile', None), 'phone', '')
+            if phone:
+                _send_sms(phone, f"Kaho : {text}"[:320])
+                sent += channel == 'sms'
+    return sent
+
+
+@shared_task
+def send_absence_reviewed(unavailability_id):
+    from .models import Unavailability
+    try:
+        u = Unavailability.objects.select_related('instructor').get(pk=unavailability_id)
+    except Unavailability.DoesNotExist:
+        return
+    ok = u.status == 'APPROVED'
+    _send_email(
+        u.instructor.email,
+        f"Votre demande d'absence est {'validée' if ok else 'refusée'} — Kaho",
+        _layout('Demande d’absence ' + ('validée' if ok else 'refusée'), f"""
+        <p>Bonjour {u.instructor.first_name},</p>
+        <p>Votre absence du <strong>{timezone.localtime(u.start):%d/%m/%Y %H:%M}</strong> au <strong>{timezone.localtime(u.end):%d/%m/%Y %H:%M}</strong>{(' (' + escape(u.reason) + ')') if u.reason else ''} est <strong>{'validée' if ok else 'refusée'}</strong>.</p>
+        {f'<p>{escape(u.review_note)}</p>' if u.review_note else ''}
+        {'' if ok else '<p>Le créneau redevient réservable par les élèves.</p>'}"""),
+    )
+
+
+@shared_task
+def send_team_invite(email, first_name, link, role_label):
+    link = escape(link)
+    _send_email(
+        email,
+        'Accès au back-office Kaho — créez votre mot de passe',
+        _layout(f'Bienvenue, {first_name} !', f"""
+        <p>Un accès <strong>{escape(role_label)}</strong> au back-office Kaho a été créé pour vous. Choisissez votre mot de passe (lien valable 72 h) :</p>
+        <p><a href="{link}" style="display:inline-block;background:#5C3D2E;color:#FBF8F3;padding:10px 18px;border-radius:999px;text-decoration:none">Créer mon mot de passe</a></p>
+        <p style="font-size:13px;color:#8B5E3C">Ou copiez ce lien : {link}</p>"""),
+    )

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { BACKOFFICE, useRequireAuth } from '@/hooks/useRequireAuth';
 import AdminShell from '@/components/AdminShell';
 
 interface Overview {
@@ -14,7 +14,7 @@ interface Overview {
 const djangoAdmin = (path: string) => `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '')}/admin/lms/${path}`;
 
 export default function AdminLms() {
-  const ready = useRequireAuth(['SUPERVISOR', 'ADMIN']);
+  const ready = useRequireAuth(BACKOFFICE);
   const [d, setD] = useState<Overview | null>(null);
   const load = useCallback(() => api.get('/lms/admin/overview/').then((r) => setD(r.data)), []);
   useEffect(() => { if (ready) load(); }, [ready, load]);

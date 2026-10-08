@@ -2,11 +2,11 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from core.admin_api import (
-    AdminActivityViewSet, AdminApplicationViewSet, AdminCalendarView, AdminDocumentViewSet, AdminInstructorViewSet, AdminInvoiceViewSet,
+    AdminAbsenceViewSet, AdminActivityViewSet, AdminApplicationViewSet, AdminCalendarView, AdminDocumentViewSet, AdminInstructorViewSet, AdminInvoiceViewSet,
     AdminOverviewView, AdminPackageViewSet, AdminPayrollView, AdminRatingViewSet, AdminSalesView, AdminSearchView,
-    AdminSlotViewSet, AdminStudentViewSet, InstructorApplicationPublicView,
+    AdminSlotViewSet, AdminStudentViewSet, AdminTeamViewSet, InstructorApplicationPublicView,
 )
-from core.views import InternalRemindersView, PasswordResetConfirmView, PasswordResetRequestView, RegisterView
+from core.views import InternalRemindersView, PasswordResetConfirmView, PasswordResetRequestView, RegisterView, StripeWebhookView
 from core.viewsets import (
     UserViewSet, StudentProfileViewSet, InstructorViewSet, AvailabilityViewSet, UnavailabilityViewSet,
     MeetingPointViewSet, SlotViewSet, CompetencyViewSet, LessonViewSet, OfferViewSet, PackageViewSet,
@@ -37,6 +37,8 @@ router.register(r'admin/ratings', AdminRatingViewSet, basename='admin-rating')
 router.register(r'admin/slots', AdminSlotViewSet, basename='admin-slot')
 router.register(r'admin/activity', AdminActivityViewSet, basename='admin-activity')
 router.register(r'admin/documents', AdminDocumentViewSet, basename='admin-document')
+router.register(r'admin/absences', AdminAbsenceViewSet, basename='admin-absence')
+router.register(r'admin/team', AdminTeamViewSet, basename='admin-team')
 
 urlpatterns = [
     path('', include(router.urls)),
@@ -48,6 +50,7 @@ urlpatterns = [
     path('admin/sales/', AdminSalesView.as_view(), name='admin_sales'),
     path('admin/payroll/', AdminPayrollView.as_view(), name='admin_payroll'),
     path('internal/reminders/', InternalRemindersView.as_view(), name='internal_reminders'),
+    path('stripe/webhook/', StripeWebhookView.as_view(), name='stripe_webhook'),
     path('instructor-applications/', InstructorApplicationPublicView.as_view(), name='instructor_application'),
     path('auth/password-reset/', PasswordResetRequestView.as_view(), name='password_reset'),
     path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),

@@ -73,7 +73,7 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = StudentProfile.objects.select_related('user', 'referent_instructor')
-        if user.role in ('SUPERVISOR', 'ADMIN'):
+        if user.role in User.BACKOFFICE_ROLES:
             return qs
         if user.role == 'INSTRUCTOR':
             return qs.filter(Q(referent_instructor=user) | Q(booked_slots__instructor=user)).distinct()
@@ -181,8 +181,17 @@ class AvailabilityViewSet(_InstructorOwnedViewSet):
 
 
 class UnavailabilityViewSet(_InstructorOwnedViewSet):
+    """Demandes d'absence du moniteur : créées « à valider », bloquent le planning immédiatement."""
     queryset = Unavailability.objects.all()
     serializer_class = UnavailabilitySerializer
+
+    def perform_create(self, serializer):
+        u = serializer.save(instructor=self.request.user, status='PENDING')
+        log_activity('ABSENCE', f"{u.instructor.get_full_name()} demande une absence du {timezone.localtime(u.start):%d/%m %H:%M} au {timezone.localtime(u.end):%d/%m %H:%M}{' : ' + u.reason if u.reason else ''}",
+                     actor=self.request.user, instructor=u.instructor)
+
+    def perform_update(self, serializer):
+        serializer.save(status='PENDING', reviewed_by=None, reviewed_at=None, review_note='')
 
 
 class MeetingPointViewSet(viewsets.ModelViewSet):
@@ -205,7 +214,7 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         qs = Slot.objects.select_related('student__user', 'meeting_point', 'instructor', 'lesson')
-        if user.role in ('SUPERVISOR', 'ADMIN'):
+        if user.role in User.BACKOFFICE_ROLES:
             return qs
         if user.role == 'INSTRUCTOR':
             return qs.filter(instructor=user)
@@ -325,7 +334,7 @@ class LessonViewSet(viewsets.ModelViewSet):
         user = self.request.user
         qs = (Lesson.objects.select_related('slot__meeting_point', 'slot__instructor', 'student__user')
               .prefetch_related('assessments__competency'))
-        if user.role in ('SUPERVISOR', 'ADMIN'):
+        if user.role in User.BACKOFFICE_ROLES:
             return qs
         if user.role == 'INSTRUCTOR':
             return qs.filter(slot__instructor=user)

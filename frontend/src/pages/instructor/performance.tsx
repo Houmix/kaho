@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { BACKOFFICE, useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
 import { PerformanceRow } from '@/lib/types';
 
 export default function Performance() {
-  const ready = useRequireAuth(['SUPERVISOR', 'ADMIN']);
+  const ready = useRequireAuth(BACKOFFICE);
   const [rows, setRows] = useState<PerformanceRow[] | null>(null);
 
   useEffect(() => { if (ready) api.get('/instructors/performance/').then((r) => setRows(r.data)); }, [ready]);

@@ -1,3 +1,8 @@
+export type PaymentMethod = 'STRIPE' | 'CASH' | 'CHECK' | 'TRANSFER' | 'CPF' | 'FREE';
+export const PAYMENT_METHODS: { key: PaymentMethod; label: string }[] = [
+  { key: 'CASH', label: 'Espèces' }, { key: 'CHECK', label: 'Chèque' }, { key: 'TRANSFER', label: 'Virement' }, { key: 'CPF', label: 'CPF' }, { key: 'STRIPE', label: 'Carte (terminal / lien)' },
+];
+
 export type OfferCategory = 'PERMIS_B' | 'CODE' | 'PERFECTIONNEMENT' | 'RECHARGE';
 
 export interface Offer {
@@ -29,6 +34,13 @@ export interface Package {
   amount_paid: string;
   status: 'PENDING' | 'COMPLETED' | 'FAILED';
   status_display: string;
+  label: string;
+  display_label: string;
+  payment_method: PaymentMethod | '';
+  payment_method_display: string;
+  stripe_checkout_url: string;
+  paid_at: string | null;
+  note?: string;
   expires_at: string | null;
   invoice_id: number | null;
   invoice_number: string | null;

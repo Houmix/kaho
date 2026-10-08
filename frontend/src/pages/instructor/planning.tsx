@@ -36,7 +36,7 @@ export default function InstructorPlanning() {
 
   if (isLoading) return <AppShell title="Planning"><p className="text-brown-500">Chargement…</p></AppShell>;
 
-  const isSupervisor = user?.role === 'SUPERVISOR' || user?.role === 'ADMIN';
+  const isSupervisor = user?.role === 'SUPERVISOR' || user?.role === 'ADMIN' || user?.role === 'OWNER';
   const visible = slots.filter((s) => filter === 'all' || (filter === 'past' ? s.is_past : !s.is_past));
   const counts = {
     booked: slots.filter((s) => s.status === 'BOOKED' && !s.is_past).length,

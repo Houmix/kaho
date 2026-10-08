@@ -16,11 +16,18 @@ class IsInstructor(BasePermission):
 
 
 class IsStaff(BasePermission):
-    """Moniteur, superviseur ou admin."""
+    """Moniteur, superviseur, admin ou gérant."""
     def has_permission(self, request, view):
-        return _has_role(request, 'INSTRUCTOR', 'SUPERVISOR', 'ADMIN')
+        return _has_role(request, 'INSTRUCTOR', 'SUPERVISOR', 'ADMIN', 'OWNER')
 
 
 class IsSupervisorOrAdmin(BasePermission):
+    """Back-office : superviseur, gestionnaire d'exploitation ou gérant."""
     def has_permission(self, request, view):
-        return _has_role(request, 'SUPERVISOR', 'ADMIN')
+        return _has_role(request, 'SUPERVISOR', 'ADMIN', 'OWNER')
+
+
+class IsOwner(BasePermission):
+    """Super admin (gérant) : trésorerie globale, paie, exports stratégiques, gestion des comptes admin."""
+    def has_permission(self, request, view):
+        return _has_role(request, 'OWNER')

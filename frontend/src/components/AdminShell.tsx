@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { SearchResults } from '@/lib/admin';
 import Logo from './Logo';
 
-const NAV: { href: string; label: string; icon: string; soon?: boolean; external?: boolean }[] = [
+const NAV: { href: string; label: string; icon: string; soon?: boolean; external?: boolean; owner?: boolean }[] = [
   { href: '/admin', label: 'Tableau de bord', icon: '▦' },
   { href: '/admin/students', label: 'Apprenants', icon: '◉' },
   { href: '/admin/instructors', label: 'Formateurs', icon: '◆' },
@@ -15,9 +15,11 @@ const NAV: { href: string; label: string; icon: string; soon?: boolean; external
   { href: '/admin/reviews', label: 'Avis', icon: '★' },
   { href: '/instructor/performance', label: 'Performance', icon: '◔' },
   { href: '/admin/activity', label: 'Activité', icon: '≡' },
-  { href: '/admin/sales', label: 'Ventes & factures', icon: '◫' },
+  { href: '/admin/sales', label: 'Ventes & factures', icon: '◫', owner: true },
   { href: '/admin/lms', label: 'Contenus LMS', icon: '▣' },
+  { href: '/admin/team', label: 'Équipe admin', icon: '⚑', owner: true },
 ];
+export const ROLE_LABELS: Record<string, string> = { OWNER: 'Gérant (super admin)', ADMIN: "Gestionnaire d'exploitation", SUPERVISOR: 'Superviseur', INSTRUCTOR: 'Moniteur', STUDENT: 'Élève' };
 
 function GlobalSearch() {
   const [q, setQ] = useState('');
@@ -77,9 +79,10 @@ export default function AdminShell({ title, children, wide = false }: { title: s
   const adminUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '/admin/');
   const isActive = (href: string) => router.pathname === href || (href !== '/admin' && router.pathname.startsWith(href)) || (href === '/admin/calendar' && router.pathname === '/instructor/planning');
 
+  const isOwner = user?.role === 'OWNER';
   const Nav = () => (
     <nav className="flex flex-col gap-0.5">
-      {NAV.map((n) => n.soon ? (
+      {NAV.filter((n) => !n.owner || isOwner).map((n) => n.soon ? (
         <span key={n.href} className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-brown-800/40 cursor-not-allowed" title="Bientôt disponible">
           <span className="w-5 text-center">{n.icon}</span>{n.label}<span className="ml-auto text-[10px] uppercase tracking-wide">bientôt</span>
         </span>
@@ -89,9 +92,9 @@ export default function AdminShell({ title, children, wide = false }: { title: s
           <span className="w-5 text-center">{n.icon}</span>{n.label}
         </Link>
       ))}
-      <a href={adminUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-brown-800 hover:bg-cream-200 mt-2 border-t border-cream-200 pt-3">
+      {isOwner && <a href={adminUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-brown-800 hover:bg-cream-200 mt-2 border-t border-cream-200 pt-3">
         <span className="w-5 text-center">⚙</span>Paramètres avancés ↗
-      </a>
+      </a>}
     </nav>
   );
 
@@ -104,7 +107,7 @@ export default function AdminShell({ title, children, wide = false }: { title: s
           <Nav />
           <div className="mt-auto pt-4 border-t border-cream-200 text-sm">
             <div className="font-medium truncate">{user?.first_name} {user?.last_name}</div>
-            <div className="text-brown-800/60 text-xs mb-2">{user?.role === 'ADMIN' ? 'Administrateur' : 'Superviseur'}</div>
+            <div className="text-brown-800/60 text-xs mb-2">{ROLE_LABELS[user?.role ?? ''] ?? ''}</div>
             <button onClick={() => { logout(); router.push('/login'); }} className="text-brown-700 hover:underline">Déconnexion</button>
           </div>
         </aside>

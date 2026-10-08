@@ -97,7 +97,7 @@ export interface InstructorAdmin {
   is_active: boolean;
   has_password: boolean;
   created_at: string;
-  profile: { id: number; hourly_rate: string; phone: string; gearbox: 'AUTO' | 'MANUAL' | 'BOTH'; gearbox_display: string; vehicle: string; bio: string; is_bookable: boolean };
+  profile: { id: number; hourly_rate: string; phone: string; gearbox: 'AUTO' | 'MANUAL' | 'BOTH'; gearbox_display: string; vehicle: string; zones: string; bio: string; is_bookable: boolean };
   stats: { upcoming: number; lessons: number; students: number; availability_slots: number; rating_average: number | null; rating_count: number };
 }
 
@@ -155,6 +155,29 @@ export interface InstructorOverview {
 }
 
 export const GEARBOX_LABELS = { AUTO: 'Automatique', MANUAL: 'Manuelle', BOTH: 'Les deux' };
+
+export interface TeamMember {
+  id: number; email: string; first_name: string; last_name: string; full_name: string;
+  role: 'OWNER' | 'ADMIN' | 'SUPERVISOR'; role_display: string; is_active: boolean; has_password: boolean; last_login: string | null; created_at: string;
+}
+
+export interface HoursBreakdown {
+  month: string; hourly_rate: number; paid_hours: number; amount: number;
+  summary: Record<'done' | 'no_show' | 'cancelled_late' | 'cancelled' | 'upcoming' | 'to_review', { count: number; hours: number }>;
+  details: Slot[];
+}
+
+export interface ReassignResult { moved: { id: number; label: string }[]; failed: { id: number; label: string; reason: string }[] }
+
+// Téléchargement authentifié (CSV / PDF servis par l'API avec le jeton JWT)
+export async function downloadFile(path: string, filename: string, params?: Record<string, unknown>) {
+  const { default: api } = await import('./api');
+  const r = await api.get(path, { responseType: 'blob', params });
+  const url = URL.createObjectURL(r.data);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.target = '_blank'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 
 export function exportCsv(filename: string, headers: string[], rows: (string | number | null | undefined)[][]) {
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;

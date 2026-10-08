@@ -42,14 +42,22 @@ export interface Availability {
   end_time: string;
 }
 
+export type AbsenceStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export interface Unavailability {
   id: number;
+  instructor?: number;
+  instructor_name?: string;
   start: string;
   end: string;
   reason: string;
+  status: AbsenceStatus;
+  status_display: string;
+  reviewed_by_name?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string;
 }
 
-export interface DossierItem { type: string; label: string; status: 'MISSING' | 'PENDING' | 'VERIFIED' | 'REJECTED'; note: string }
+export interface DossierItem { type: string; label: string; status: 'MISSING' | 'PENDING' | 'VERIFIED' | 'REJECTED'; note: string; required: boolean }
 export interface Dossier { items: DossierItem[]; complete: boolean; pending: number; missing: number }
 export interface DocumentItem {
   id: number;
@@ -74,9 +82,24 @@ export interface CompetencyProgress {
   percent: number;
 }
 
+export type StudentStatus = 'INCOMPLETE' | 'REGISTERED' | 'CODE' | 'DRIVING' | 'EXAM' | 'LICENSED' | 'ARCHIVED';
+export const STUDENT_STATUSES: { key: StudentStatus; label: string; cls: string }[] = [
+  { key: 'INCOMPLETE', label: 'Dossier incomplet', cls: 'bg-cream-200 text-brown-800' },
+  { key: 'REGISTERED', label: 'Inscrit / NEPH en attente', cls: 'bg-caramel/40 text-brown-900' },
+  { key: 'CODE', label: 'Code en cours', cls: 'bg-caramel text-brown-900' },
+  { key: 'DRIVING', label: 'Prêt pour la conduite', cls: 'bg-brown-300 text-brown-900' },
+  { key: 'EXAM', label: 'Examen réservé', cls: 'bg-brown-500 text-cream-50' },
+  { key: 'LICENSED', label: 'Permis obtenu', cls: 'bg-brown-700 text-cream-50' },
+  { key: 'ARCHIVED', label: 'Archivé', cls: 'bg-cream-100 text-brown-800/50' },
+];
+export const statusOf = (k: string) => STUDENT_STATUSES.find((s) => s.key === k) ?? STUDENT_STATUSES[0];
+
 export interface StudentProfile {
   id: number;
   user: { id: number; first_name: string; last_name: string; email: string };
+  status: StudentStatus;
+  status_display: string;
+  phone?: string;
   purchased_hours: number;
   used_hours: number;
   remaining_hours: number;

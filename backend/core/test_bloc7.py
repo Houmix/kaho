@@ -28,7 +28,7 @@ class DocumentsTests(APITestCase):
         self.auth('eleve@test.fr', 'testpass123')
         d = self.client.get('/api/documents/my_dossier/').data
         self.assertFalse(d['dossier']['complete'])
-        self.assertEqual(d['dossier']['missing'], 3)
+        self.assertEqual(d['dossier']['missing'], 5)
 
         r = self.upload('IDENTITY')
         self.assertEqual(r.status_code, 201, r.content)
@@ -50,7 +50,7 @@ class DocumentsTests(APITestCase):
 
         d = self.client.get('/api/documents/my_dossier/').data
         self.assertEqual(d['dossier']['pending'], 1)
-        self.assertEqual(d['dossier']['missing'], 2)
+        self.assertEqual(d['dossier']['missing'], 4)
         self.assertEqual(ActivityLog.objects.filter(kind='DOCUMENT').count(), 2)
 
     def test_admin_verifies_and_rejects_with_emails(self):
@@ -58,9 +58,11 @@ class DocumentsTests(APITestCase):
         ident = self.upload('IDENTITY').data['id']
         neph = self.upload('NEPH_CERTIFICATE').data['id']
         contract = self.upload('CONTRACT').data['id']
+        photo = self.upload('PHOTO').data['id']
+        address = self.upload('PROOF_ADDRESS').data['id']
 
         self.auth('a@kaho.app')
-        self.assertEqual(self.client.get('/api/admin/documents/?status=PENDING').data['count'], 3)
+        self.assertEqual(self.client.get('/api/admin/documents/?status=PENDING').data['count'], 5)
         self.assertIn('documents', [a['kind'] for a in self.client.get('/api/admin/overview/').data['alerts']])
         self.assertEqual(self.client.get('/api/admin/students/?filter=documents').data['count'], 1)
 
@@ -73,6 +75,8 @@ class DocumentsTests(APITestCase):
         self.assertIn('Document illisible', mail.outbox[-1].alternatives[0][0])
 
         self.client.post(f'/api/admin/documents/{ident}/verify/')
+        self.client.post(f'/api/admin/documents/{photo}/verify/')
+        self.client.post(f'/api/admin/documents/{address}/verify/')
         r = self.client.post(f'/api/admin/documents/{contract}/verify/')
         self.assertEqual(r.data['status'], 'VERIFIED')
         self.assertEqual(r.data['verified_by_name'], 'Al Admin')

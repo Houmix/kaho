@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import api from '@/lib/api';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { BACKOFFICE, useRequireAuth } from '@/hooks/useRequireAuth';
 import AdminShell from '@/components/AdminShell';
 import { InstructorAdmin, Paginated, RatingAdmin } from '@/lib/admin';
 import { apiError, frDate } from '@/lib/types';
@@ -28,7 +28,7 @@ function Row({ r, onChange }: { r: RatingAdmin; onChange: (text: string, ok?: bo
 }
 
 export default function AdminReviews() {
-  const ready = useRequireAuth(['SUPERVISOR', 'ADMIN']);
+  const ready = useRequireAuth(BACKOFFICE);
   const router = useRouter();
   const [instructor, setInstructor] = useState('');
   const [unanswered, setUnanswered] = useState(false);

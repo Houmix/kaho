@@ -181,6 +181,7 @@ COMPANY_SIRET = config('COMPANY_SIRET', default='')
 COMPANY_VAT_NUMBER = config('COMPANY_VAT_NUMBER', default='')    # n° TVA intracommunautaire, vide si franchise
 COMPANY_EMAIL = config('COMPANY_EMAIL', default='contact@kaho-auto-ecole.fr')
 COMPANY_PHONE = config('COMPANY_PHONE', default='')
+COMPANY_AGREMENT = config('COMPANY_AGREMENT', default='')      # n° d'agrément préfectoral (contrats)
 INVOICE_PREFIX = config('INVOICE_PREFIX', default='KAHO')
 INVOICE_VAT_RATE = config('INVOICE_VAT_RATE', default=20.0, cast=float)  # 0 si franchise en base (art. 293 B)
 INVOICE_FOOTER = config('INVOICE_FOOTER', default='Paiement par virement, carte ou espèces. Pas d’escompte pour paiement anticipé. En cas de retard, pénalités au taux légal et indemnité forfaitaire de 40 € (art. L441-10 C. com.).')
@@ -226,6 +227,7 @@ BREVO_SMS_SENDER = config('BREVO_SMS_SENDER', default='Kaho')  # 11 caractères 
 # Stripe Configuration
 STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
 STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
+STRIPE_WEBHOOK_SECRET = config('STRIPE_WEBHOOK_SECRET', default='')  # signature des webhooks (checkout.session.completed)
 
 # OTP Configuration
 OTP_TOTP_ISSUER = 'Kaho'

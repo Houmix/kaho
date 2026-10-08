@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import api from '@/lib/api';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { BACKOFFICE, useRequireAuth } from '@/hooks/useRequireAuth';
 import AdminShell from '@/components/AdminShell';
-import { Application, GEARBOX_LABELS, InstructorAdmin, Paginated } from '@/lib/admin';
-import { apiError, frDate } from '@/lib/types';
+import { Application, GEARBOX_LABELS, InstructorAdmin, Paginated, exportCsv } from '@/lib/admin';
+import { Unavailability, apiError, frDate } from '@/lib/types';
 
 function NewInstructorForm({ onDone }: { onDone: () => void }) {
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', hourly_rate: '', gearbox: 'BOTH', vehicle: '' });
@@ -78,9 +78,10 @@ function ApplicationCard({ app, onChange }: { app: Application; onChange: (text:
 }
 
 export default function AdminInstructors() {
-  const ready = useRequireAuth(['SUPERVISOR', 'ADMIN']);
+  const ready = useRequireAuth(BACKOFFICE);
   const router = useRouter();
-  const [tab, setTab] = useState<'list' | 'applications'>('list');
+  const [tab, setTab] = useState<'list' | 'applications' | 'absences'>('list');
+  const [absences, setAbsences] = useState<Paginated<Unavailability> | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [q, setQ] = useState('');
   const [list, setList] = useState<Paginated<InstructorAdmin> | null>(null);
@@ -91,12 +92,14 @@ export default function AdminInstructors() {
   useEffect(() => {
     if (!router.isReady) return;
     if (router.query.tab === 'applications') setTab('applications');
+    if (router.query.tab === 'absences') setTab('absences');
     if (router.query.new === '1') setShowNew(true);
   }, [router.isReady, router.query]);
 
   const load = useCallback(() => {
     api.get('/admin/instructors/', { params: { q: q || undefined, page_size: 100 } }).then((r) => setList(r.data));
     api.get('/admin/applications/', { params: { status: appStatus || undefined } }).then((r) => setApps(r.data));
+    api.get('/admin/absences/', { params: { status: 'PENDING', page_size: 100 } }).then((r) => setAbsences(r.data));
   }, [q, appStatus]);
   useEffect(() => { if (!ready) return; const t = setTimeout(load, 200); return () => clearTimeout(t); }, [ready, load]);
 
@@ -105,19 +108,47 @@ export default function AdminInstructors() {
     catch (err) { setMsg({ ok: false, text: apiError(err, 'Envoi impossible.') }); }
   };
   const pendingCount = apps && appStatus === 'PENDING' ? apps.count : null;
+  const review = async (u: Unavailability, ok: boolean) => {
+    const note = ok ? '' : prompt('Motif du refus (envoyé au moniteur) :');
+    if (!ok && note === null) return;
+    try { await api.post(`/admin/absences/${u.id}/${ok ? 'approve' : 'reject'}/`, { note }); setMsg({ ok: true, text: ok ? 'Absence validée.' : 'Absence refusée, créneau rouvert.' }); load(); }
+    catch (err) { setMsg({ ok: false, text: apiError(err, 'Action impossible.') }); }
+  };
+  const csv = () => list && exportCsv('moniteurs.csv', ['Nom', 'Prénom', 'Email', 'Téléphone', 'Boîte', 'Véhicule', 'Zones', 'Taux horaire', 'Réservable', 'Actif', 'Leçons', 'Élèves', 'Note', 'Avis'],
+    list.results.map((i) => [i.last_name, i.first_name, i.email, i.profile.phone, i.profile.gearbox_display, i.profile.vehicle, i.profile.zones, i.profile.hourly_rate, i.profile.is_bookable ? 'oui' : 'non', i.is_active ? 'oui' : 'non', i.stats.lessons, i.stats.students, i.stats.rating_average ?? '', i.stats.rating_count]));
 
   return (
     <AdminShell title="Formateurs" wide>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 className="text-3xl">Formateurs</h1>
-        <button onClick={() => { setTab('list'); setShowNew((v) => !v); }} className="btn-primary">+ Ajouter un moniteur</button>
+        <div className="flex gap-2"><button onClick={csv} className="btn-secondary" disabled={!list?.results.length}>Exporter CSV</button><button onClick={() => { setTab('list'); setShowNew((v) => !v); }} className="btn-primary">+ Ajouter un moniteur</button></div>
       </div>
       {msg && <div className={`rounded-xl px-4 py-3 mb-4 text-sm ${msg.ok ? 'border border-brown-300 bg-brown-50' : 'border border-red-200 bg-red-50 text-red-700'}`}>{msg.text}</div>}
 
       <div className="flex gap-1 mb-6">
         <button onClick={() => setTab('list')} className={`badge !px-4 !py-2 ${tab === 'list' ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>Moniteurs {list ? `(${list.count})` : ''}</button>
         <button onClick={() => setTab('applications')} className={`badge !px-4 !py-2 ${tab === 'applications' ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>Candidatures {pendingCount ? `(${pendingCount})` : ''}</button>
+        <button onClick={() => setTab('absences')} className={`badge !px-4 !py-2 ${tab === 'absences' ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>Absences à valider {absences?.count ? `(${absences.count})` : ''}</button>
       </div>
+
+      {tab === 'absences' && (
+        !absences ? <p className="text-brown-500">Chargement…</p> : absences.results.length === 0 ? <p className="text-brown-800/60">Aucune demande d'absence en attente.</p> : (
+          <div className="card p-0 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-cream-100 text-brown-800/70"><tr><th className="text-left py-3 px-4 font-medium">Moniteur</th><th className="text-left py-3 px-4 font-medium">Du</th><th className="text-left py-3 px-4 font-medium">Au</th><th className="text-left py-3 px-4 font-medium">Motif</th><th></th></tr></thead>
+              <tbody>{absences.results.map((u) => (
+                <tr key={u.id} className="border-t border-cream-200">
+                  <td className="py-3 px-4"><Link href={`/admin/instructors/${u.instructor}`} className="text-brown-700 hover:underline">{u.instructor_name}</Link></td>
+                  <td className="py-3 px-4">{new Date(u.start).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                  <td className="py-3 px-4">{new Date(u.end).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                  <td className="py-3 px-4 text-brown-800/70">{u.reason || '—'}</td>
+                  <td className="py-3 px-4 text-right whitespace-nowrap space-x-3"><button onClick={() => review(u, true)} className="btn-primary !py-1 text-xs">Valider</button><button onClick={() => review(u, false)} className="text-red-700 text-xs hover:underline">Refuser</button></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )
+      )}
 
       {tab === 'list' && (
         <>
@@ -126,14 +157,14 @@ export default function AdminInstructors() {
           <div className="card p-0 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-cream-100 text-brown-800/70"><tr>
-                <th className="text-left py-3 px-4 font-medium">Moniteur</th><th className="text-left py-3 px-4 font-medium">Contact</th><th className="text-left py-3 px-4 font-medium">Boîte</th><th className="text-right py-3 px-4 font-medium">Taux</th><th className="text-right py-3 px-4 font-medium">Dispos</th><th className="text-right py-3 px-4 font-medium">À venir</th><th className="text-left py-3 px-4 font-medium">Note</th><th className="text-left py-3 px-4 font-medium">Statut</th><th></th>
+                <th className="text-left py-3 px-4 font-medium">Moniteur</th><th className="text-left py-3 px-4 font-medium">Contact</th><th className="text-left py-3 px-4 font-medium">Boîte · zones</th><th className="text-right py-3 px-4 font-medium">Taux</th><th className="text-right py-3 px-4 font-medium">Dispos</th><th className="text-right py-3 px-4 font-medium">À venir</th><th className="text-left py-3 px-4 font-medium">Note</th><th className="text-left py-3 px-4 font-medium">Statut</th><th></th>
               </tr></thead>
               <tbody>
                 {!list ? <tr><td colSpan={9} className="py-10 text-center text-brown-500">Chargement…</td></tr> : list.results.length === 0 ? <tr><td colSpan={9} className="py-10 text-center text-brown-800/60">Aucun moniteur</td></tr> : list.results.map((i) => (
                   <tr key={i.id} className="border-t border-cream-200 hover:bg-cream-50">
                     <td className="py-3 px-4"><Link href={`/admin/instructors/${i.id}`} className="font-medium text-brown-700 hover:underline">{i.last_name} {i.first_name}</Link></td>
                     <td className="py-3 px-4 text-brown-800/70">{i.email}{i.profile.phone && <><br />{i.profile.phone}</>}</td>
-                    <td className="py-3 px-4">{i.profile.gearbox_display}</td>
+                    <td className="py-3 px-4">{i.profile.gearbox_display}{i.profile.zones && <><br /><span className="text-xs text-brown-800/60">{i.profile.zones}</span></>}</td>
                     <td className="py-3 px-4 text-right">{Number(i.profile.hourly_rate)} €/h</td>
                     <td className={`py-3 px-4 text-right ${i.stats.availability_slots === 0 ? 'text-red-700 font-semibold' : ''}`}>{i.stats.availability_slots}</td>
                     <td className="py-3 px-4 text-right">{i.stats.upcoming}</td>

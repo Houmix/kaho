@@ -74,6 +74,7 @@ class AvailabilityInline(admin.TabularInline):
 
 class UnavailabilityInline(admin.TabularInline):
     model = Unavailability
+    fk_name = 'instructor'
     extra = 0
 
 
@@ -93,8 +94,9 @@ class AvailabilityAdmin(admin.ModelAdmin):
 
 @admin.register(Unavailability)
 class UnavailabilityAdmin(admin.ModelAdmin):
-    list_display = ('instructor', 'start', 'end', 'reason')
-    list_filter = ('instructor',)
+    list_display = ('instructor', 'start', 'end', 'reason', 'status')
+    list_filter = ('status', 'instructor')
+    readonly_fields = ('reviewed_by', 'reviewed_at')
 
 
 @admin.register(Offer)
@@ -132,8 +134,8 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(StudentProfile)
 class StudentProfileAdmin(admin.ModelAdmin):
-    list_display = ('get_user_name', 'phone', 'referent_instructor', 'neph_number', 'purchased_hours', 'used_hours', 'remaining_hours', 'ready_for_exam')
-    list_filter = ('license_type', 'ready_for_exam', 'referent_instructor')
+    list_display = ('get_user_name', 'status', 'phone', 'referent_instructor', 'neph_number', 'purchased_hours', 'used_hours', 'remaining_hours', 'ready_for_exam')
+    list_filter = ('status', 'license_type', 'ready_for_exam', 'referent_instructor')
     autocomplete_fields = ('referent_instructor',)
     search_fields = ('user__email', 'neph_number', 'user__first_name', 'user__last_name')
     ordering = ('user__last_name',)
@@ -194,7 +196,7 @@ class PackageAdmin(admin.ModelAdmin):
     readonly_fields = ('expires_at', 'created_at', 'updated_at')
     fieldsets = (
         (None, {'fields': ('student', 'offer', 'hours_purchased', 'amount_paid')}),
-        ('Paiement', {'fields': ('status', 'stripe_payment_id', 'note'),
+        ('Paiement', {'fields': ('status', 'payment_method', 'label', 'stripe_payment_id', 'stripe_checkout_url', 'note'),
                       'description': "Passer en « Payé » crédite automatiquement les heures et l'accès LMS à l'élève."}),
         ('Dates', {'fields': ('expires_at', 'created_at', 'updated_at')}),
     )
