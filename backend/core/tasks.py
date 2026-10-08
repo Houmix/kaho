@@ -23,15 +23,32 @@ def _send_email(to_email, subject, html):
         print(f"[email] échec d'envoi à {to_email}: {e}")
 
 
+def _normalize_phone(phone):
+    """06 12 34 56 78 → 33612345678 (format attendu par Brevo)."""
+    digits = ''.join(ch for ch in (phone or '') if ch.isdigit())
+    if digits.startswith('00'):
+        digits = digits[2:]
+    elif digits.startswith('0') and len(digits) == 10:
+        digits = '33' + digits[1:]
+    return digits or None
+
+
 def _send_sms(phone, body):
-    sid, token, sender = settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN, settings.TWILIO_PHONE_NUMBER
-    if not all([sid, token, sender, phone]):
+    recipient = _normalize_phone(phone)
+    if not settings.BREVO_API_KEY or not recipient:
         return
     try:
-        from twilio.rest import Client
-        Client(sid, token).messages.create(body=body, from_=sender, to=phone)
+        import requests
+        r = requests.post(
+            'https://api.brevo.com/v3/transactionalSMS/sms',
+            headers={'api-key': settings.BREVO_API_KEY, 'accept': 'application/json'},
+            json={'type': 'transactional', 'sender': settings.BREVO_SMS_SENDER, 'recipient': recipient, 'content': body},
+            timeout=10,
+        )
+        if r.status_code >= 400:
+            print(f"[sms] Brevo a refusé l'envoi à {recipient}: {r.status_code} {r.text}")
     except Exception as e:
-        print(f"[sms] échec d'envoi à {phone}: {e}")
+        print(f"[sms] échec d'envoi à {recipient}: {e}")
 
 
 def _layout(title, body_html):
@@ -105,7 +122,7 @@ def send_lesson_reminders():
             </ul>
             <p>Merci d'arriver 5 minutes avant l'heure.</p>"""),
         )
-        _send_sms(slot.student.emergency_phone, f"Kaho : rappel de votre leçon demain à {slot.start_time:%H:%M}, {slot.meeting_point.name}.")
+        _send_sms(slot.student.phone, f"Kaho : rappel de votre leçon demain à {slot.start_time:%H:%M} avec {slot.instructor.first_name}, RDV {slot.meeting_point.name}.")
 
 
 @shared_task

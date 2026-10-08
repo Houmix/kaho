@@ -29,6 +29,7 @@ class RegisterSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, min_length=8)
     first_name = serializers.CharField(max_length=150)
     last_name = serializers.CharField(max_length=150)
+    phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
     def validate_email(self, value):
         if User.objects.filter(email__iexact=value).exists():
@@ -36,7 +37,12 @@ class RegisterSerializer(serializers.Serializer):
         return value.lower()
 
     def create(self, validated_data):
-        return User.objects.create_user(username=validated_data['email'], role='STUDENT', **validated_data)
+        phone = validated_data.pop('phone', '')
+        user = User.objects.create_user(username=validated_data['email'], role='STUDENT', **validated_data)
+        if phone:
+            user.student_profile.phone = phone
+            user.student_profile.save(update_fields=['phone'])
+        return user
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -60,7 +66,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProfile
         fields = (
-            'id', 'user', 'neph_number', 'purchased_hours', 'used_hours',
+            'id', 'user', 'neph_number', 'phone', 'purchased_hours', 'used_hours',
             'remaining_hours', 'reserved_hours', 'bookable_hours',
             'lms_access', 'lms_access_until', 'has_lms_access',
             'referent_instructor', 'referent_instructor_name', 'emergency_contact', 'emergency_phone',

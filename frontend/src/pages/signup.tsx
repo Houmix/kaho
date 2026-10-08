@@ -10,7 +10,7 @@ export default function Signup() {
   const router = useRouter();
   const offerId = typeof router.query.offer === 'string' ? router.query.offer : null;
   const { setToken, setUser } = useAuth();
-  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', password: '' });
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', phone: '', password: '' });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -58,6 +58,10 @@ export default function Signup() {
           <label className="block">
             <span className="text-sm font-medium text-brown-800">Email</span>
             <input type="email" required value={form.email} onChange={update('email')} className="input-field mt-1" placeholder="vous@exemple.fr" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-brown-800">Mobile <span className="text-brown-800/50 font-normal">(rappels par SMS, facultatif)</span></span>
+            <input type="tel" autoComplete="tel" value={form.phone} onChange={update('phone')} className="input-field mt-1" placeholder="06 12 34 56 78" />
           </label>
           <label className="block">
             <span className="text-sm font-medium text-brown-800">Mot de passe</span>

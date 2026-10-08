@@ -101,7 +101,7 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(StudentProfile)
 class StudentProfileAdmin(admin.ModelAdmin):
-    list_display = ('get_user_name', 'referent_instructor', 'neph_number', 'purchased_hours', 'used_hours', 'remaining_hours', 'ready_for_exam')
+    list_display = ('get_user_name', 'phone', 'referent_instructor', 'neph_number', 'purchased_hours', 'used_hours', 'remaining_hours', 'ready_for_exam')
     list_filter = ('license_type', 'ready_for_exam', 'referent_instructor')
     autocomplete_fields = ('referent_instructor',)
     search_fields = ('user__email', 'neph_number', 'user__first_name', 'user__last_name')

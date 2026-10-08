@@ -31,10 +31,12 @@ class BookingFlowTests(APITestCase):
 
         r = self.client.post('/api/auth/register/', {
             'email': 'eleve@test.fr', 'password': 'testpass123', 'first_name': 'Jean', 'last_name': 'Dupont',
+            'phone': '06 12 34 56 78',
         })
         self.assertEqual(r.status_code, 201, r.content)
         self.student_token = r.data['access']
         self.student = StudentProfile.objects.get(user__email='eleve@test.fr')
+        self.assertEqual(self.student.phone, '06 12 34 56 78')
         self.student.purchased_hours = 2
         self.student.save()
 

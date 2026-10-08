@@ -43,6 +43,7 @@ class StudentProfile(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
     neph_number = models.CharField(max_length=50, unique=True, blank=True)
+    phone = models.CharField("Téléphone mobile (SMS)", max_length=20, blank=True)
     purchased_hours = models.FloatField(default=0, validators=[MinValueValidator(0)])
     used_hours = models.FloatField(default=0, validators=[MinValueValidator(0)])
     emergency_contact = models.CharField(max_length=100, blank=True)

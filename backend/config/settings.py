@@ -99,7 +99,10 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
 
 # Derrière le proxy Railway (HTTPS terminé en amont)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -108,12 +111,30 @@ CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default='http://localhost:
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Google Cloud Storage
+# Google Cloud Storage — documents privés (pièces d'identité, NEPH, contrats)
+# GCS_CREDENTIALS = contenu du JSON du compte de service, brut ou encodé en base64
 USE_GCS = config('USE_GCS', default=False, cast=bool)
 if USE_GCS:
-    DEFAULT_FILE_STORAGE = 'storages.backends.gcloud.GoogleCloudStorage'
-    GS_BUCKET_NAME = config('GCS_BUCKET_NAME', default='kaho-documents')
-    GS_CREDENTIALS = config('GCS_CREDENTIALS', default=None)
+    import base64
+    import json
+    from google.oauth2 import service_account
+
+    _raw = config('GCS_CREDENTIALS')
+    try:
+        _info = json.loads(_raw)
+    except ValueError:
+        _info = json.loads(base64.b64decode(_raw))
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_info(_info)
+    GS_BUCKET_NAME = config('GCS_BUCKET_NAME')
+    GS_PROJECT_ID = _info.get('project_id')
+    GS_DEFAULT_ACL = None          # bucket en accès uniforme : pas d'ACL par objet
+    GS_QUERYSTRING_AUTH = True     # URLs signées temporaires pour les fichiers privés
+    GS_EXPIRATION = timedelta(minutes=30)
+    GS_FILE_OVERWRITE = False
+    STORAGES = {
+        'default': {'BACKEND': 'storages.backends.gcloud.GoogleCloudStorage'},
+        'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+    }
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -174,10 +195,9 @@ EMAIL_BACKEND = (
     else 'django.core.mail.backends.console.EmailBackend'
 )
 
-# Twilio Configuration
-TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')
-TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN', default='')
-TWILIO_PHONE_NUMBER = config('TWILIO_PHONE_NUMBER', default='')
+# SMS via Brevo (clé API v3, différente de la clé SMTP). Sans clé, aucun SMS n'est envoyé.
+BREVO_API_KEY = config('BREVO_API_KEY', default='')
+BREVO_SMS_SENDER = config('BREVO_SMS_SENDER', default='Kaho')  # 11 caractères alphanumériques max
 
 # Stripe Configuration
 STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')

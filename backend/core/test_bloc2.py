@@ -6,6 +6,16 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from .models import Competency, MeetingPoint, Offer, Package, Slot, StudentProfile, User
+from .tasks import _normalize_phone
+
+
+class PhoneNormalizationTests(APITestCase):
+    def test_french_numbers_are_converted_for_brevo(self):
+        self.assertEqual(_normalize_phone('06 12 34 56 78'), '33612345678')
+        self.assertEqual(_normalize_phone('+33 6 12 34 56 78'), '33612345678')
+        self.assertEqual(_normalize_phone('0033612345678'), '33612345678')
+        self.assertIsNone(_normalize_phone(''))
+        self.assertIsNone(_normalize_phone(None))
 
 
 def make_student(email='eleve@test.fr', hours=10):
