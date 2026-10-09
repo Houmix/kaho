@@ -47,7 +47,11 @@ class CalendarAndActivityTests(APITestCase):
         self.assertEqual(len(self.client.get('/api/admin/calendar/', {'start': self.monday, 'end': self.monday, 'instructor': self.karim.id}).data['slots']), 0)
         self.assertEqual(self.client.get('/api/admin/calendar/', {'start': self.monday, 'end': self.monday + timedelta(days=90)}).status_code, 400)
         self.auth('c@kaho.app')
-        self.assertEqual(self.client.get('/api/admin/calendar/', {'start': self.monday, 'end': self.monday}).status_code, 403)
+        # Un moniteur accède au calendrier, limité à son propre planning
+        r = self.client.get('/api/admin/calendar/', {'start': self.monday, 'end': self.monday})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual({s['instructor'] for s in r.data['slots']}, {self.claire.id})
+        self.assertEqual(len(r.data['instructors']), 1)
 
     def test_move_slot_reschedules_reassigns_and_notifies(self):
         self.auth('a@kaho.app')

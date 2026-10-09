@@ -27,10 +27,11 @@ interface Props {
   onMove: (slot: Slot, target: { date: string; start_time: string; instructor?: number }) => void;
   onSelect: (slot: Slot) => void;
   onPickDay: (d: Date) => void;
+  readOnly?: boolean;
 }
 
-function SlotChip({ s, style, onSelect, compact }: { s: Slot; style?: React.CSSProperties; onSelect: (s: Slot) => void; compact?: boolean }) {
-  const draggable = s.status === 'BOOKED' && !s.is_past;
+function SlotChip({ s, style, onSelect, compact, readOnly }: { s: Slot; style?: React.CSSProperties; onSelect: (s: Slot) => void; compact?: boolean; readOnly?: boolean }) {
+  const draggable = s.status === 'BOOKED' && !s.is_past && !readOnly;
   return (
     <button
       draggable={draggable}
@@ -45,7 +46,8 @@ function SlotChip({ s, style, onSelect, compact }: { s: Slot; style?: React.CSSP
   );
 }
 
-function TimeGrid({ columns, slots, unavail, onMove, onSelect, dayOf, instructorOf, availabilityOf }: {
+function TimeGrid({ columns, slots, unavail, onMove, onSelect, dayOf, instructorOf, availabilityOf, readOnly }: {
+  readOnly?: boolean;
   columns: { key: string; label: string; sub?: string }[];
   slots: Slot[];
   unavail: CalendarData['unavailabilities'];
@@ -103,7 +105,7 @@ function TimeGrid({ columns, slots, unavail, onMove, onSelect, dayOf, instructor
               {colSlots.map((s) => {
                 const top = (minutes(s.start_time) - HOUR_START * 60) / 60 * PX_PER_HOUR;
                 const h = (minutes(s.end_time) - minutes(s.start_time)) / 60 * PX_PER_HOUR;
-                return <SlotChip key={s.id} s={s} onSelect={onSelect} compact={h < 40} style={{ position: 'absolute', left: 3, right: 3, top, height: Math.max(22, h - 2) }} />;
+                return <SlotChip key={s.id} s={s} onSelect={onSelect} readOnly={readOnly} compact={h < 40} style={{ position: 'absolute', left: 3, right: 3, top, height: Math.max(22, h - 2) }} />;
               })}
               {hover?.key === c.key && <div className="absolute inset-x-1 border-t-2 border-brown-500 pointer-events-none" style={{ top: (hover.mins - HOUR_START * 60) / 60 * PX_PER_HOUR }}><span className="absolute -top-4 left-0 text-[10px] bg-brown-500 text-cream-50 rounded px-1">{toTime(hover.mins)}</span></div>}
             </div>
@@ -114,7 +116,7 @@ function TimeGrid({ columns, slots, unavail, onMove, onSelect, dayOf, instructor
   );
 }
 
-export default function Calendar({ view, anchor, data, onMove, onSelect, onPickDay }: Props) {
+export default function Calendar({ view, anchor, data, onMove, onSelect, onPickDay, readOnly }: Props) {
   const availabilityFor = (instructor: number | undefined, dateStr: string) => {
     const wd = (new Date(dateStr + 'T00:00:00').getDay() + 6) % 7;
     return data.availabilities.filter((a) => a.weekday === wd && (instructor === undefined || a.instructor === instructor)).map((a) => ({ start: minutes(a.start_time), end: minutes(a.end_time) }));
@@ -124,7 +126,7 @@ export default function Calendar({ view, anchor, data, onMove, onSelect, onPickD
     const day = iso(anchor);
     const cols = data.instructors.map((i) => ({ key: String(i.id), label: i.name, sub: i.is_bookable ? undefined : 'non réservable' }));
     return cols.length === 0 ? <p className="text-brown-800/60">Aucun moniteur actif.</p> : (
-      <TimeGrid columns={cols} slots={data.slots} unavail={data.unavailabilities} onMove={onMove} onSelect={onSelect}
+      <TimeGrid columns={cols} slots={data.slots} unavail={data.unavailabilities} onMove={onMove} onSelect={onSelect} readOnly={readOnly}
         dayOf={() => day} instructorOf={(k) => Number(k)} availabilityOf={(k) => availabilityFor(Number(k), day)} />
     );
   }
@@ -133,7 +135,7 @@ export default function Calendar({ view, anchor, data, onMove, onSelect, onPickD
     const start = startOfWeek(anchor);
     const cols = Array.from({ length: 7 }, (_, i) => { const d = addDays(start, i); return { key: iso(d), label: frDate(iso(d), { weekday: 'short', day: 'numeric' }), sub: frDate(iso(d), { month: 'short' }) }; });
     return (
-      <TimeGrid columns={cols} slots={data.slots} unavail={data.unavailabilities} onMove={onMove} onSelect={onSelect}
+      <TimeGrid columns={cols} slots={data.slots} unavail={data.unavailabilities} onMove={onMove} onSelect={onSelect} readOnly={readOnly}
         dayOf={(k) => k} instructorOf={() => undefined} availabilityOf={(k) => availabilityFor(undefined, k)} />
     );
   }
@@ -160,7 +162,7 @@ export default function Calendar({ view, anchor, data, onMove, onSelect, onPickD
               onDrop={(e) => { e.preventDefault(); const s = data.slots.find((x) => x.id === Number(e.dataTransfer.getData('text/plain'))); if (s) onMove(s, { date: k, start_time: hm(s.start_time) }); }}>
               <div className={`text-xs mb-1 ${k === today ? 'inline-block bg-brown-700 text-cream-50 rounded-full px-1.5' : ''}`}>{d.getDate()}</div>
               <div className="space-y-0.5">
-                {list.slice(0, 3).map((s) => <SlotChip key={s.id} s={s} onSelect={(x) => { onSelect(x); }} compact />)}
+                {list.slice(0, 3).map((s) => <SlotChip key={s.id} s={s} onSelect={(x) => { onSelect(x); }} compact readOnly={readOnly} />)}
                 {list.length > 3 && <div className="text-[10px] text-brown-800/60">+{list.length - 3} autres</div>}
               </div>
             </div>

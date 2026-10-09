@@ -15,7 +15,7 @@ export default function BackLink({ fallbackHref, fallbackLabel }: { fallbackHref
   return <Link href={target.href} className="inline-flex items-center gap-1 text-sm text-brown-700 hover:underline mb-2">{target.label}</Link>;
 }
 
-/** Lien vers une fiche élève en conservant l'origine pour le bouton de retour. */
-export function studentHref(isBackoffice: boolean, studentId: number | string, from: 'planning' | 'calendar' | 'dashboard') {
-  return `${isBackoffice ? '/admin/students' : '/instructor/students'}/${studentId}?from=${from}`;
+/** Fiche élève (unique, adaptée au rôle) en conservant l'origine pour le bouton de retour. */
+export function studentHref(studentId: number | string, from: 'planning' | 'calendar' | 'dashboard' = 'planning') {
+  return `/admin/students/${studentId}?from=${from}`;
 }

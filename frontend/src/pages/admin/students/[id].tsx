@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import api from '@/lib/api';
-import { BACKOFFICE, useRequireAuth } from '@/hooks/useRequireAuth';
+import { BACKOFFICE, STAFF_ROLES, useRequireAuth } from '@/hooks/useRequireAuth';
+import { useAuth } from '@/hooks/useAuth';
+import InstructorStudentSheet from '@/components/InstructorStudentSheet';
 import AdminShell from '@/components/AdminShell';
 import ProgressGauge from '@/components/ProgressGauge';
 import PdfLink from '@/components/PdfLink';
@@ -68,7 +70,7 @@ function BookForStudent({ studentId, onDone }: { studentId: number; onDone: (tex
   );
 }
 
-export default function AdminStudentDetail() {
+function AdminStudentSheet() {
   const ready = useRequireAuth(BACKOFFICE);
   const router = useRouter();
   const id = typeof router.query.id === 'string' ? router.query.id : null;
@@ -308,4 +310,12 @@ export default function AdminStudentDetail() {
       )}
     </AdminShell>
   );
+}
+
+/** Fiche élève unique : le back-office voit le dossier complet, un moniteur le suivi pédagogique. */
+export default function StudentSheetPage() {
+  const ready = useRequireAuth(STAFF_ROLES);
+  const { user } = useAuth();
+  if (!ready || !user) return null;
+  return ['SUPERVISOR', 'ADMIN', 'OWNER'].includes(user.role) ? <AdminStudentSheet /> : <InstructorStudentSheet />;
 }

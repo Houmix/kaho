@@ -91,7 +91,7 @@ export default function InstructorHome() {
               <tbody>
                 {data.students.map((st) => (
                   <tr key={st.id} className="border-t border-cream-200">
-                    <td className="py-2"><Link href={`/instructor/students/${st.id}`} className="font-medium text-brown-700 hover:underline">{st.user.first_name} {st.user.last_name}</Link></td>
+                    <td className="py-2"><Link href={`/admin/students/${st.id}?from=dashboard`} className="font-medium text-brown-700 hover:underline">{st.user.first_name} {st.user.last_name}</Link></td>
                     <td className="py-2">{st.license_type === 'AUTO' ? 'Auto' : 'Manuelle'}</td>
                     <td className="py-2 text-right">{st.competency_progress.percent} %</td>
                     <td className="py-2 text-right">{st.used_hours.toFixed(1)} h</td>

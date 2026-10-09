@@ -78,7 +78,7 @@ export default function LessonForm() {
       <h1 className="text-3xl mt-2 mb-1">{existing ? 'Modifier le bilan' : 'Bilan de leçon'}</h1>
       <p className="text-brown-800/70 mb-2">{slot.student_name} · {frDate(slot.date)} · {hm(slot.start_time)}–{hm(slot.end_time)} · {slot.meeting_point_name}</p>
       {slot.student && <div className="flex flex-wrap gap-2 mb-6">
-        <Link href={`/instructor/students/${slot.student}?from=planning`} className="btn-secondary !py-1.5 text-sm">Fiche élève & historique</Link>
+        <Link href={`/admin/students/${slot.student}?from=planning`} className="btn-secondary !py-1.5 text-sm">Fiche élève & historique</Link>
         {logbook?.student.phone && <a href={`tel:${logbook.student.phone}`} className="btn-secondary !py-1.5 text-sm">📞 Appeler</a>}
         {logbook?.student.phone && <a href={`sms:${logbook.student.phone}`} className="btn-secondary !py-1.5 text-sm">💬 SMS</a>}
         {logbook?.student.user.email && <a href={`mailto:${logbook.student.user.email}`} className="btn-secondary !py-1.5 text-sm">✉ Email</a>}

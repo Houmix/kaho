@@ -140,3 +140,28 @@ class CancellationRulesAndAssessmentLockTests(APITestCase):
         self.assertEqual(r.status_code, 200)
         r = self.client.patch(f'/api/availabilities/{av.id}/', {'end_time': '08:00'}, format='json')
         self.assertEqual(r.status_code, 400)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+class UnifiedPlanningTests(APITestCase):
+    def test_instructor_calendar_is_scoped_to_own_slots(self):
+        a, b = _user('a@kaho.app', 'INSTRUCTOR'), _user('b@kaho.app', 'INSTRUCTOR')
+        admin = _user('adm@kaho.app', 'ADMIN')
+        stu = _user('s@kaho.app', 'STUDENT').student_profile
+        day = timezone.localdate() + timedelta(days=2)
+        for ins in (a, b):
+            Slot.objects.create(instructor=ins, student=stu, status='BOOKED', date=day, start_time=time(9), end_time=time(10))
+        params = {'start': day.isoformat(), 'end': day.isoformat()}
+
+        def login(email):
+            r = self.client.post('/api/auth/token/', {'username': email, 'password': 'pass12345'})
+            self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {r.data['access']}")
+        login('a@kaho.app')
+        r = self.client.get('/api/admin/calendar/', params)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([s['instructor'] for s in r.data['slots']], [a.id])
+        self.assertEqual([i['id'] for i in r.data['instructors']], [a.id])
+        login('adm@kaho.app')
+        self.assertEqual(len(self.client.get('/api/admin/calendar/', params).data['slots']), 2)
+        login('s@kaho.app')
+        self.assertEqual(self.client.get('/api/admin/calendar/', params).status_code, 403)

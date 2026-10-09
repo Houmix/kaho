@@ -22,7 +22,7 @@ from .models import (
     MeetingPoint, Offer, Package, Slot, StudentProfile, Unavailability, User, log_activity,
 )
 from .scheduling import busy_periods
-from .permissions import IsOwner, IsSupervisorOrAdmin
+from .permissions import IsOwner, IsStaff, IsSupervisorOrAdmin
 from .serializers import (
     DocumentSerializer, InstructorAdminSerializer, InstructorApplicationSerializer, InstructorCreateSerializer,
     InstructorProfileSerializer, InvoiceSerializer, LessonSerializer, PackageSerializer, RatingModerationSerializer,
@@ -751,8 +751,9 @@ class AdminApplicationViewSet(viewsets.ReadOnlyModelViewSet):
 # ---------- Planning global ----------
 
 class AdminCalendarView(APIView):
-    """Créneaux + absences entre deux dates, pour la vue calendrier. ?start=&end=[&instructor=&meeting_point=&status=]"""
-    permission_classes = [IsSupervisorOrAdmin]
+    """Créneaux + absences entre deux dates, pour la vue calendrier. ?start=&end=[&instructor=&meeting_point=&status=]
+    Back-office : toute l'école. Moniteur : uniquement son propre planning."""
+    permission_classes = [IsStaff]
 
     def get(self, request):
         p = request.query_params
@@ -764,13 +765,18 @@ class AdminCalendarView(APIView):
             return Response({'detail': 'Plage maximale : 62 jours.'}, status=400)
         slots = Slot.objects.filter(date__range=(start, end)).select_related('student__user', 'instructor', 'meeting_point', 'lesson')
         unavail = Unavailability.objects.filter(start__date__lte=end, end__date__gte=start).select_related('instructor')
-        if p.get('instructor'):
+        own_only = request.user.role not in User.BACKOFFICE_ROLES
+        if own_only:
+            slots, unavail = slots.filter(instructor=request.user), unavail.filter(instructor=request.user)
+        elif p.get('instructor'):
             slots, unavail = slots.filter(instructor_id=p['instructor']), unavail.filter(instructor_id=p['instructor'])
         if p.get('meeting_point'):
             slots = slots.filter(meeting_point_id=p['meeting_point'])
         if p.get('status'):
             slots = slots.filter(status__in=p['status'].split(','))
         instructors = User.instructors().filter(is_active=True).select_related('instructor_profile').order_by('last_name')
+        if own_only:
+            instructors = instructors.filter(pk=request.user.pk)
         return Response({
             'slots': SlotSerializer(slots, many=True).data,
             'unavailabilities': [{'id': u.id, 'instructor': u.instructor_id, 'instructor_name': u.instructor.get_full_name(), 'start': u.start, 'end': u.end, 'reason': u.reason} for u in unavail],
