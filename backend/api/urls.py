@@ -6,7 +6,7 @@ from core.admin_api import (
     AdminOverviewView, AdminPackageViewSet, AdminPayrollView, AdminRatingViewSet, AdminSalesView, AdminSearchView,
     AdminSlotViewSet, AdminStudentViewSet, AdminTeamViewSet, InstructorApplicationPublicView,
 )
-from core.views import InternalRemindersView, PasswordResetConfirmView, PasswordResetRequestView, RegisterView, StripeWebhookView
+from core.views import InternalRemindersView, PasswordResetConfirmView, PasswordResetRequestView, LoginView, RegisterView, StripeWebhookView
 from core.viewsets import (
     UserViewSet, StudentProfileViewSet, InstructorViewSet, AvailabilityViewSet, UnavailabilityViewSet,
     MeetingPointViewSet, SlotViewSet, CompetencyViewSet, LessonViewSet, OfferViewSet, PackageViewSet,
@@ -55,6 +55,6 @@ urlpatterns = [
     path('instructor-applications/', InstructorApplicationPublicView.as_view(), name='instructor_application'),
     path('auth/password-reset/', PasswordResetRequestView.as_view(), name='password_reset'),
     path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
-    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('auth/token/', LoginView.as_view(), name='token_obtain_pair'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]

@@ -11,8 +11,9 @@ class IsStudent(BasePermission):
 
 
 class IsInstructor(BasePermission):
+    """Moniteur, ou membre de l'équipe admin qui enseigne aussi."""
     def has_permission(self, request, view):
-        return _has_role(request, 'INSTRUCTOR')
+        return request.user.is_authenticated and request.user.teaches
 
 
 class IsStaff(BasePermission):

@@ -75,7 +75,7 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
         qs = StudentProfile.objects.select_related('user', 'referent_instructor')
         if user.role in User.BACKOFFICE_ROLES:
             return qs
-        if user.role == 'INSTRUCTOR':
+        if user.teaches:
             return qs.filter(Q(referent_instructor=user) | Q(booked_slots__instructor=user)).distinct()
         return qs.filter(user=user)
 
@@ -96,7 +96,7 @@ class StudentProfileViewSet(viewsets.ModelViewSet):
 
 
 class InstructorViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = User.objects.filter(role='INSTRUCTOR', instructor_profile__is_bookable=True).order_by('last_name')
+    queryset = User.instructors().filter(instructor_profile__is_bookable=True).order_by('last_name')
     serializer_class = InstructorPublicSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -143,7 +143,7 @@ class InstructorViewSet(viewsets.ReadOnlyModelViewSet):
     def performance(self, request):
         """Tableau de performance : avis, leçons, absences par moniteur."""
         rows = []
-        for ins in User.objects.filter(role='INSTRUCTOR').select_related('instructor_profile').order_by('last_name'):
+        for ins in User.instructors().select_related('instructor_profile').order_by('last_name'):
             lessons = Lesson.objects.filter(slot__instructor=ins)
             ratings = LessonRating.objects.filter(lesson__slot__instructor=ins).aggregate(avg=Avg('score'), n=Count('id'))
             rows.append({
@@ -216,7 +216,7 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
         qs = Slot.objects.select_related('student__user', 'meeting_point', 'instructor', 'lesson')
         if user.role in User.BACKOFFICE_ROLES:
             return qs
-        if user.role == 'INSTRUCTOR':
+        if user.teaches:
             return qs.filter(instructor=user)
         return qs.filter(student__user=user)
 
@@ -228,7 +228,7 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
             duration = int(request.query_params.get('duration', 60))
         except ValueError:
             return Response({'detail': 'Paramètre date (YYYY-MM-DD) requis.'}, status=400)
-        instructors = User.objects.filter(role='INSTRUCTOR', instructor_profile__is_bookable=True)
+        instructors = User.instructors().filter(instructor_profile__is_bookable=True)
         if request.query_params.get('instructor'):
             instructors = instructors.filter(pk=request.query_params['instructor'])
         windows = [
@@ -336,7 +336,7 @@ class LessonViewSet(viewsets.ModelViewSet):
               .prefetch_related('assessments__competency'))
         if user.role in User.BACKOFFICE_ROLES:
             return qs
-        if user.role == 'INSTRUCTOR':
+        if user.teaches:
             return qs.filter(slot__instructor=user)
         return qs.filter(student__user=user)
 

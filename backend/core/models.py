@@ -29,6 +29,7 @@ class User(AbstractUser):
     TEAM_ROLES = ('SUPERVISOR', 'ADMIN', 'OWNER')
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='STUDENT')
+    also_instructor = models.BooleanField("Enseigne aussi (planning, disponibilités, bilans)", default=False, help_text="Pour un gérant / gestionnaire qui donne des leçons")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -37,6 +38,16 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.get_full_name()} ({self.get_role_display()})"
+
+    @property
+    def teaches(self):
+        """Moniteur de métier, ou membre de l'équipe admin qui donne aussi des leçons."""
+        return self.role == 'INSTRUCTOR' or (self.role in self.TEAM_ROLES and self.also_instructor)
+
+    @classmethod
+    def instructors(cls):
+        """Tous les comptes qui enseignent (moniteurs + admins-moniteurs)."""
+        return cls.objects.filter(models.Q(role='INSTRUCTOR') | models.Q(role__in=cls.TEAM_ROLES, also_instructor=True))
 
 
 class StudentProfile(models.Model):

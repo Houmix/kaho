@@ -73,10 +73,12 @@ class RegisterSerializer(serializers.Serializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    teaches = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role')
-        read_only_fields = ('id',)
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 'also_instructor', 'teaches')
+        read_only_fields = ('id', 'also_instructor')
 
 
 class TeamMemberSerializer(serializers.ModelSerializer):
@@ -88,7 +90,7 @@ class TeamMemberSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'role_display', 'is_active', 'has_password', 'last_login', 'created_at')
+        fields = ('id', 'email', 'first_name', 'last_name', 'full_name', 'role', 'role_display', 'is_active', 'also_instructor', 'has_password', 'last_login', 'created_at')
         read_only_fields = ('id', 'email', 'created_at')
 
     def get_has_password(self, obj):
@@ -311,7 +313,7 @@ class FreeWindowSerializer(serializers.Serializer):
 
 class BookingSerializer(serializers.Serializer):
     instructor = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.filter(role='INSTRUCTOR', instructor_profile__is_bookable=True)
+        queryset=User.instructors().filter(instructor_profile__is_bookable=True)
     )
     meeting_point = serializers.PrimaryKeyRelatedField(queryset=MeetingPoint.objects.all())
     date = serializers.DateField()
@@ -572,3 +574,17 @@ class VehicleLogSerializer(serializers.ModelSerializer):
         model = VehicleLog
         fields = ('id', 'instructor', 'instructor_name', 'date', 'kilometers', 'fuel_cost', 'maintenance_alert', 'notes', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_at', 'updated_at')
+
+
+# ---------- Connexion ----------
+
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+
+class FrenchTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Messages d'erreur en français ; l'email est insensible à la casse (voir core.auth_backends)."""
+    default_error_messages = {'no_active_account': 'Email ou mot de passe incorrect.'}
+
+    def validate(self, attrs):
+        attrs[self.username_field] = (attrs.get(self.username_field) or '').strip().lower()
+        return super().validate(attrs)

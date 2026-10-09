@@ -7,6 +7,8 @@ export interface User {
   first_name: string;
   last_name: string;
   role: 'STUDENT' | 'INSTRUCTOR' | 'SUPERVISOR' | 'ADMIN' | 'OWNER';
+  also_instructor?: boolean;
+  teaches?: boolean;
 }
 
 interface AuthState {

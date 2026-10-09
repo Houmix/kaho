@@ -6,10 +6,11 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import User
 from .serializers import (
-    PasswordResetConfirmSerializer, PasswordResetRequestSerializer, RegisterSerializer, UserSerializer,
+    FrenchTokenObtainPairSerializer, PasswordResetConfirmSerializer, PasswordResetRequestSerializer, RegisterSerializer, UserSerializer,
 )
 from .tasks import send_password_reset_email
 
@@ -83,3 +84,7 @@ class StripeWebhookView(APIView):
         from .payments import handle_webhook
         ok, message = handle_webhook(request.body, request.headers.get('Stripe-Signature', ''))
         return Response({'detail': message}, status=200 if ok else 400)
+
+
+class LoginView(TokenObtainPairView):
+    serializer_class = FrenchTokenObtainPairSerializer

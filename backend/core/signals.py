@@ -5,7 +5,7 @@ from .models import User, StudentProfile, InstructorProfile
 
 @receiver(post_save, sender=User)
 def create_instructor_profile(sender, instance, **kwargs):
-    if instance.role == 'INSTRUCTOR':
+    if instance.teaches:
         InstructorProfile.objects.get_or_create(user=instance)
 
 

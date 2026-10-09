@@ -160,6 +160,8 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
+AUTHENTICATION_BACKENDS = ['core.auth_backends.EmailBackend']
+
 # JWT Configuration
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),

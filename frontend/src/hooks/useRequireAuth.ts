@@ -11,7 +11,8 @@ export function useRequireAuth(roles?: Role | Role[]): boolean {
   const { hasHydrated, isAuthenticated, user } = useAuthStore();
   const router = useRouter();
   const allowedRoles = roles === undefined ? null : Array.isArray(roles) ? roles : [roles];
-  const allowed = hasHydrated && isAuthenticated && (!allowedRoles || (!!user && allowedRoles.includes(user.role)));
+  // Un admin / gérant qui enseigne aussi accède aux pages moniteur
+  const allowed = hasHydrated && isAuthenticated && (!allowedRoles || (!!user && (allowedRoles.includes(user.role) || (allowedRoles.includes('INSTRUCTOR') && !!user.teaches))));
 
   useEffect(() => {
     if (hasHydrated && !allowed) router.replace('/login');

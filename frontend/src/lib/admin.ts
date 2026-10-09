@@ -158,7 +158,7 @@ export const GEARBOX_LABELS = { AUTO: 'Automatique', MANUAL: 'Manuelle', BOTH: '
 
 export interface TeamMember {
   id: number; email: string; first_name: string; last_name: string; full_name: string;
-  role: 'OWNER' | 'ADMIN' | 'SUPERVISOR'; role_display: string; is_active: boolean; has_password: boolean; last_login: string | null; created_at: string;
+  role: 'OWNER' | 'ADMIN' | 'SUPERVISOR'; role_display: string; is_active: boolean; also_instructor: boolean; has_password: boolean; last_login: string | null; created_at: string;
 }
 
 export interface HoursBreakdown {

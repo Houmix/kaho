@@ -14,7 +14,7 @@ const ROLES: { key: TeamMember['role']; label: string; hint: string }[] = [
 
 export default function AdminTeam() {
   const ready = useRequireAuth('OWNER');
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [team, setTeam] = useState<TeamMember[] | null>(null);
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', role: 'ADMIN' as TeamMember['role'] });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -25,7 +25,7 @@ export default function AdminTeam() {
 
   const act = async (fn: () => Promise<unknown>, okText: string) => {
     setMsg(null);
-    try { await fn(); await load(); setMsg({ ok: true, text: okText }); }
+    try { await fn(); await load(); setMsg({ ok: true, text: okText }); api.get('/users/me/').then((r) => setUser(r.data)).catch(() => {}); }
     catch (err) { setMsg({ ok: false, text: apiError(err, 'Action impossible.') }); }
   };
   const invite = async (e: React.FormEvent) => {
@@ -56,7 +56,8 @@ export default function AdminTeam() {
                         {ROLES.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
                       </select>
                     </td>
-                    <td className="py-3 px-4">{!m.is_active ? <span className="badge bg-red-100 text-red-700">désactivé</span> : !m.has_password ? <span className="badge bg-caramel text-brown-900">invitation en attente</span> : <span className="badge bg-brown-700 text-cream-50">actif</span>}</td>
+                    <td className="py-3 px-4">{!m.is_active ? <span className="badge bg-red-100 text-red-700">désactivé</span> : !m.has_password ? <span className="badge bg-caramel text-brown-900">invitation en attente</span> : <span className="badge bg-brown-700 text-cream-50">actif</span>}
+                      <label className="block text-xs mt-1 flex items-center gap-1"><input type="checkbox" checked={m.also_instructor} onChange={(e) => act(() => api.patch(`/admin/team/${m.id}/`, { also_instructor: e.target.checked }), e.target.checked ? 'Espace moniteur activé : planning, disponibilités et bilans accessibles depuis la barre latérale.' : 'Espace moniteur retiré.')} className="accent-brown-700" /> enseigne aussi</label></td>
                     <td className="py-3 px-4 text-brown-800/70">{m.last_login ? frDate(m.last_login, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                     <td className="py-3 px-4 text-right whitespace-nowrap space-x-3 text-xs">
                       {!m.has_password && m.is_active && <button onClick={() => act(() => api.post(`/admin/team/${m.id}/resend_invite/`), 'Invitation renvoyée.')} className="text-brown-700 hover:underline">Renvoyer l'invitation</button>}

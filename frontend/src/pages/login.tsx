@@ -37,7 +37,7 @@ export default function Login() {
       <Head><title>Connexion — Kaho</title></Head>
       <div className="min-h-screen grid md:grid-cols-2">
         <div className="hidden md:flex flex-col justify-between bg-brown-700 text-cream-50 p-10">
-          <img src="/logo.svg" alt="Kaho" className="h-9 w-auto brightness-0 invert" />
+          <Logo light className="h-9" />
           <div>
             <h2 className="text-3xl mb-3">Bon retour.</h2>
             <p className="text-cream-200">Vos prochaines leçons et votre livret vous attendent.</p>

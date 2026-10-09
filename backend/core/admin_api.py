@@ -109,10 +109,10 @@ class AdminOverviewView(APIView):
             'unpaid': {'count': pending.count(), 'amount': float(pending.aggregate(s=Sum('amount_paid'))['s'] or 0)},
             'students': {'active': active_students, 'total': StudentProfile.objects.count()},
             'instructors': {
-                'total': User.objects.filter(role='INSTRUCTOR', is_active=True).count(),
+                'total': User.instructors().filter(is_active=True).count(),
                 'bookable': InstructorProfile.objects.filter(is_bookable=True, user__is_active=True).count(),
                 'pending_applications': InstructorApplication.objects.filter(status='PENDING').count(),
-                'without_password': User.objects.filter(role='INSTRUCTOR', is_active=True, password__startswith='!').count(),
+                'without_password': User.instructors().filter(is_active=True, password__startswith='!').count(),
             },
             'occupancy': {'percent': occupancy, 'booked_hours': round(booked, 1), 'opened_hours': round(opened, 1)},
             'rating': {'average': round(rating['avg'], 2) if rating['avg'] else None, 'count': rating['n']},
@@ -132,7 +132,7 @@ class AdminOverviewView(APIView):
             alerts.append({'kind': 'applications', 'count': n, 'text': f"{n} candidature{'s' if n > 1 else ''} de moniteur à examiner", 'href': '/admin/instructors?tab=applications'})
         if pending.exists():
             alerts.append({'kind': 'unpaid', 'count': pending.count(), 'text': f"{pending.count()} achat{'s' if pending.count() > 1 else ''} en attente de paiement", 'href': '/admin/students?filter=unpaid'})
-        no_avail = User.objects.filter(role='INSTRUCTOR', is_active=True, instructor_profile__is_bookable=True, availabilities__isnull=True).distinct()
+        no_avail = User.instructors().filter(is_active=True, instructor_profile__is_bookable=True, availabilities__isnull=True).distinct()
         if no_avail.exists():
             alerts.append({'kind': 'availability', 'count': no_avail.count(), 'text': f"{no_avail.count()} moniteur{'s' if no_avail.count() > 1 else ''} sans disponibilités (invisible{'s' if no_avail.count() > 1 else ''} à la réservation)", 'href': '/admin/instructors'})
         absences = Unavailability.objects.filter(status='PENDING').count()
@@ -156,7 +156,7 @@ class AdminSearchView(APIView):
             return Response({'students': [], 'instructors': [], 'packages': [], 'slots': []})
         name_q = Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q) | Q(user__email__icontains=q)
         students = StudentProfile.objects.filter(name_q | Q(phone__icontains=q) | Q(neph_number__icontains=q)).select_related('user')[:6]
-        instructors = User.objects.filter(role='INSTRUCTOR').filter(
+        instructors = User.instructors().filter(
             Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(email__icontains=q))[:6]
         packages = Package.objects.none()
         if q.lstrip('#').isdigit():
@@ -544,7 +544,7 @@ class AdminInstructorViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'head', 'options']
 
     def get_queryset(self):
-        qs = User.objects.filter(role='INSTRUCTOR').select_related('instructor_profile').order_by('last_name', 'first_name')
+        qs = User.instructors().select_related('instructor_profile').order_by('last_name', 'first_name')
         q = self.request.query_params.get('q')
         if q:
             qs = qs.filter(Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(email__icontains=q))
@@ -641,7 +641,7 @@ class AdminInstructorViewSet(viewsets.ModelViewSet):
         source = self.get_object()
         try:
             start, end = date_cls.fromisoformat(request.data.get('start', '')), date_cls.fromisoformat(request.data.get('end', ''))
-            target = User.objects.get(pk=request.data.get('target'), role='INSTRUCTOR', is_active=True)
+            target = User.instructors().get(pk=request.data.get('target'), is_active=True)
         except (ValueError, User.DoesNotExist):
             return Response({'detail': 'Dates (YYYY-MM-DD) et moniteur cible requis.'}, status=400)
         if target.id == source.id:
@@ -770,7 +770,7 @@ class AdminCalendarView(APIView):
             slots = slots.filter(meeting_point_id=p['meeting_point'])
         if p.get('status'):
             slots = slots.filter(status__in=p['status'].split(','))
-        instructors = User.objects.filter(role='INSTRUCTOR', is_active=True).select_related('instructor_profile').order_by('last_name')
+        instructors = User.instructors().filter(is_active=True).select_related('instructor_profile').order_by('last_name')
         return Response({
             'slots': SlotSerializer(slots, many=True).data,
             'unavailabilities': [{'id': u.id, 'instructor': u.instructor_id, 'instructor_name': u.instructor.get_full_name(), 'start': u.start, 'end': u.end, 'reason': u.reason} for u in unavail],
@@ -796,7 +796,7 @@ class AdminSlotViewSet(viewsets.GenericViewSet):
         try:
             new_date = date_cls.fromisoformat(d.get('date', slot.date.isoformat()))
             new_start = time_cls.fromisoformat(d.get('start_time', slot.start_time.strftime('%H:%M')))
-            instructor = User.objects.get(pk=d.get('instructor', slot.instructor_id), role='INSTRUCTOR', is_active=True)
+            instructor = User.instructors().get(pk=d.get('instructor', slot.instructor_id), is_active=True)
         except (ValueError, User.DoesNotExist):
             return Response({'detail': 'Date, heure ou moniteur invalide.'}, status=400)
         duration = datetime.combine(slot.date, slot.end_time) - datetime.combine(slot.date, slot.start_time)
@@ -944,7 +944,7 @@ class AdminPayrollView(APIView):
             return Response({'detail': 'Paramètre month (YYYY-MM) invalide.'}, status=400)
         end = date_cls(y + (m // 12), m % 12 + 1, 1)
         rows, total = [], 0.0
-        for ins in User.objects.filter(role='INSTRUCTOR').select_related('instructor_profile').order_by('last_name'):
+        for ins in User.instructors().select_related('instructor_profile').order_by('last_name'):
             lessons = Lesson.objects.filter(slot__instructor=ins, attended=True, slot__date__gte=start, slot__date__lt=end).select_related('slot__student__user', 'slot__meeting_point').order_by('slot__date', 'slot__start_time')
             hours = round(sum(l.slot.duration_hours for l in lessons), 2)
             rate = float(ins.instructor_profile.hourly_rate) if hasattr(ins, 'instructor_profile') else 0.0
@@ -1097,6 +1097,13 @@ class AdminTeamViewSet(viewsets.ModelViewSet):
         if bool(new_active) != user.is_active:
             user.is_active = bool(new_active)
             changes.append('activé' if user.is_active else 'désactivé')
+        if 'also_instructor' in request.data:
+            flag = str(request.data['also_instructor']).lower() not in ('false', '0', '')
+            if flag != user.also_instructor:
+                user.also_instructor = flag
+                changes.append('enseigne aussi' if flag else "n'enseigne plus")
+                if flag:
+                    InstructorProfile.objects.get_or_create(user=user)
         user.save()
         if changes:
             log_activity('TEAM', f"Compte {user.get_full_name()} : {', '.join(changes)}", actor=request.user)

@@ -128,3 +128,40 @@ class OfferEngineTests(APITestCase):
         r = self.client.patch(f'/api/lms/admin/questions/{q.id}/', {'image_url': r.data['url'], 'video_url': 'https://vimeo.com/123'}, format='json')
         self.assertEqual(r.status_code, 200, r.content)
         self.assertIn('/media/lms/', r.data['image_url'])
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True)
+class LoginAndAdminInstructorTests(APITestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username='gerant@kaho.app', email='gerant@kaho.app', password='pass12345', first_name='Gé', last_name='Rant', role='OWNER')
+
+    def test_login_is_case_insensitive_with_french_error(self):
+        r = self.client.post('/api/auth/token/', {'username': 'Gerant@KAHO.app ', 'password': 'pass12345'})
+        self.assertEqual(r.status_code, 200, r.content)
+        r = self.client.post('/api/auth/token/', {'username': 'gerant@kaho.app', 'password': 'faux'})
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(r.data['detail'], 'Email ou mot de passe incorrect.')
+        # inscription avec majuscules → compte en minuscules, connexion possible dans les deux sens
+        r = self.client.post('/api/auth/register/', {'email': 'Nouvel.Eleve@Test.FR', 'password': 'motdepasse1', 'first_name': 'N', 'last_name': 'E'})
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.client.post('/api/auth/token/', {'username': 'NOUVEL.ELEVE@test.fr', 'password': 'motdepasse1'}).status_code, 200)
+
+    def test_owner_can_also_teach(self):
+        r = self.client.post('/api/auth/token/', {'username': 'gerant@kaho.app', 'password': 'pass12345'})
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {r.data['access']}")
+        # sans le drapeau : pas d'espace moniteur
+        self.assertEqual(self.client.get('/api/instructors/dashboard/').status_code, 403)
+        self.assertFalse(self.client.get('/api/users/me/').data['teaches'])
+        r = self.client.patch(f'/api/admin/team/{self.owner.id}/', {'also_instructor': True}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(r.data['also_instructor'])
+        me = self.client.get('/api/users/me/').data
+        self.assertTrue(me['teaches'])
+        self.assertEqual(me['role'], 'OWNER')  # reste gérant
+        self.assertEqual(self.client.get('/api/instructors/dashboard/').status_code, 200)
+        self.assertEqual(self.client.post('/api/availabilities/', {'weekday': 0, 'start_time': '09:00', 'end_time': '12:00'}).status_code, 201)
+        # apparaît comme moniteur (liste admin, réservation élève)
+        self.assertIn(self.owner.id, [i['id'] for i in self.client.get('/api/admin/instructors/').data['results']])
+        pub = self.client.get('/api/instructors/').data
+        self.assertIn(self.owner.id, [i['id'] for i in (pub['results'] if isinstance(pub, dict) else pub)])
+        self.assertEqual(self.client.get('/api/admin/sales/').status_code, 200)  # droits gérant conservés

@@ -77,9 +77,13 @@ export default function AdminShell({ title, children, wide = false }: { title: s
   const { user, logout } = useAuth();
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
-  const isActive = (href: string) => router.pathname === href || (href !== '/admin' && router.pathname.startsWith(href)) || (href === '/admin/calendar' && router.pathname === '/instructor/planning');
+  const isActive = (href: string) => router.pathname === href || (href !== '/admin' && router.pathname.startsWith(href)) || (href === '/admin/calendar' && router.pathname === '/instructor/planning' && !user?.teaches);
 
   const isOwner = user?.role === 'OWNER';
+  const TEACH_NAV = user?.teaches ? [
+    { href: '/instructor/dashboard', label: 'Mes leçons', icon: '🚗' },
+    { href: '/instructor/availability', label: 'Mes disponibilités', icon: '◷' },
+  ] : [];
   const Nav = () => (
     <nav className="flex flex-col gap-0.5">
       {NAV.filter((n) => !n.owner || isOwner).map((n) => n.soon ? (
@@ -89,6 +93,13 @@ export default function AdminShell({ title, children, wide = false }: { title: s
       ) : (
         <Link key={n.href} href={n.href} onClick={() => setDrawer(false)}
           className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium ${isActive(n.href) ? 'bg-brown-700 text-cream-50' : 'text-brown-800 hover:bg-cream-200'}`}>
+          <span className="w-5 text-center">{n.icon}</span>{n.label}
+        </Link>
+      ))}
+      {TEACH_NAV.length > 0 && <p className="px-3 pt-4 pb-1 text-[10px] uppercase tracking-wide text-brown-800/50">Mon espace moniteur</p>}
+      {TEACH_NAV.map((n) => (
+        <Link key={n.href} href={n.href} onClick={() => setDrawer(false)}
+          className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium ${router.pathname.startsWith(n.href) ? 'bg-brown-700 text-cream-50' : 'text-brown-800 hover:bg-cream-200'}`}>
           <span className="w-5 text-center">{n.icon}</span>{n.label}
         </Link>
       ))}
