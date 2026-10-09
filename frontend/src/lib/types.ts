@@ -32,6 +32,9 @@ export interface FreeWindow {
   date: string;
   start_time: string;
   end_time: string;
+  meeting_point: number | null;
+  meeting_point_name: string | null;
+  meeting_point_address: string | null;
 }
 
 export interface Availability {
@@ -40,6 +43,8 @@ export interface Availability {
   weekday_display: string;
   start_time: string;
   end_time: string;
+  meeting_point: number | null;
+  meeting_point_name: string | null;
 }
 
 export type AbsenceStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -113,6 +118,7 @@ export interface StudentProfile {
   referent_instructor_name: string | null;
   competency_progress: CompetencyProgress;
   dossier: Dossier;
+  formula: { name: string; paid_at: string | null; expires_at: string | null; hours: number } | null;
   created_at?: string;
 }
 

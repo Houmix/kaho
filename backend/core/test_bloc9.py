@@ -193,3 +193,75 @@ class BookingWithoutMeetingPointTests(APITestCase):
         r = self.client.post('/api/meeting-points/', {'name': 'Gare', 'address': 'Place de la gare'})
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(len(self.client.get('/api/meeting-points/').data), 1)
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, BOOKING_MIN_NOTICE_HOURS=0)
+class InstructorSpaceTests(APITestCase):
+    def setUp(self):
+        from .models import Availability, MeetingPoint
+        self.ins = User.objects.create_user(username='m@kaho.app', email='m@kaho.app', password='pass12345', first_name='Kawtar', last_name='K', role='INSTRUCTOR')
+        self.other = User.objects.create_user(username='m2@kaho.app', email='m2@kaho.app', password='pass12345', first_name='Mia', last_name='M', role='INSTRUCTOR')
+        self.gare = MeetingPoint.objects.create(name='Gare', address='Place de la gare')
+        for wd in range(7):
+            Availability.objects.create(instructor=self.ins, weekday=wd, start_time='08:00', end_time='20:00', meeting_point=self.gare)
+        su = User.objects.create_user(username='e@test.fr', email='e@test.fr', password='pass12345', first_name='Jean', last_name='D', role='STUDENT')
+        self.student = su.student_profile
+        self.student.purchased_hours, self.student.phone = 10, '0612345678'
+        self.student.save()
+
+    def auth(self, u):
+        r = self.client.post('/api/auth/token/', {'username': u, 'password': 'pass12345'})
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {r.data['access']}")
+
+    def test_availability_place_flows_to_free_windows_and_booking_and_balance(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        self.auth('e@test.fr')
+        day = (timezone.localdate() + timedelta(days=2)).isoformat()
+        w = self.client.get(f'/api/slots/free/?date={day}&instructor={self.ins.id}').data[0]
+        self.assertEqual(w['meeting_point_name'], 'Gare')
+        before = self.client.get('/api/student-profiles/my_profile/').data
+        self.assertEqual(before['bookable_hours'], 10)
+        r = self.client.post('/api/slots/book/', {'instructor': self.ins.id, 'date': day, 'start_time': w['start_time'], 'end_time': w['end_time']}, format='json')
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.data['meeting_point_name'], 'Gare')  # lieu hérité de la disponibilité
+        after = self.client.get('/api/student-profiles/my_profile/').data
+        self.assertEqual(after['bookable_hours'], 9)   # décompté dès la réservation
+        self.assertEqual(after['reserved_hours'], 1)
+        self.assertEqual(after['remaining_hours'], 10)
+        # annulation dans les règles → heure réinjectée
+        self.client.post(f"/api/slots/{r.data['id']}/cancel/")
+        self.assertEqual(self.client.get('/api/student-profiles/my_profile/').data['bookable_hours'], 10)
+
+    def test_instructor_student_sheet_and_contact(self):
+        from datetime import timedelta
+        from django.core import mail
+        from django.utils import timezone
+        from .models import Lesson, Slot
+        past = timezone.localdate() - timedelta(days=3)
+        s1 = Slot.objects.create(instructor=self.other, student=self.student, meeting_point=self.gare, date=past, start_time='09:00', end_time='10:00', status='BOOKED')
+        s1.refresh_from_db()
+        Lesson.objects.create(slot=s1, student=self.student, attended=True, instructor_notes='Bon démarrage, travailler le créneau.')
+        Slot.objects.create(instructor=self.ins, student=self.student, meeting_point=None, date=timezone.localdate() + timedelta(days=1), start_time='09:00', end_time='10:00', status='BOOKED')
+        self.auth('m@kaho.app')
+        prof = self.client.get(f'/api/student-profiles/{self.student.id}/').data
+        self.assertEqual(prof['phone'], '0612345678')
+        self.assertEqual(prof['user']['email'], 'e@test.fr')
+        lb = self.client.get(f'/api/student-profiles/{self.student.id}/logbook/').data
+        self.assertEqual(lb['lessons'][0]['instructor_name'], 'Mia M')  # leçon faite par un autre moniteur, visible
+        self.assertIn('créneau', lb['lessons'][0]['instructor_notes'])
+        mail.outbox.clear()
+        r = self.client.post('/api/instructors/message/', {'student': self.student.id, 'subject': 'Demain', 'body': 'RDV 9h devant la gare.', 'channel': 'email'})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Kawtar K', mail.outbox[0].alternatives[0][0])
+        # un moniteur sans lien avec l'élève ne peut pas lui écrire
+        stranger = User.objects.create_user(username='x@kaho.app', email='x@kaho.app', password='pass12345', role='INSTRUCTOR')
+        self.auth('x@kaho.app')
+        self.assertEqual(self.client.post('/api/instructors/message/', {'student': self.student.id, 'subject': 'a', 'body': 'b'}).status_code, 404)
+        # l'élève voit le détail de son bilan
+        self.auth('e@test.fr')
+        lessons = self.client.get('/api/lessons/').data
+        items = lessons['results'] if isinstance(lessons, dict) else lessons
+        self.assertEqual(items[0]['instructor_name'], 'Mia M')
+        self.assertEqual(self.client.get(f"/api/lessons/{items[0]['id']}/").status_code, 200)

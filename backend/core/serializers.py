@@ -128,6 +128,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     referent_instructor_name = serializers.CharField(source='referent_instructor.get_full_name', read_only=True, default=None)
     competency_progress = serializers.SerializerMethodField()
     dossier = serializers.SerializerMethodField()
+    formula = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentProfile
@@ -136,7 +137,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
             'remaining_hours', 'reserved_hours', 'bookable_hours',
             'lms_access', 'lms_access_until', 'has_lms_access',
             'referent_instructor', 'referent_instructor_name', 'emergency_contact', 'emergency_phone',
-            'license_type', 'ready_for_exam', 'competency_progress', 'dossier', 'created_at', 'updated_at',
+            'license_type', 'ready_for_exam', 'competency_progress', 'dossier', 'formula', 'created_at', 'updated_at',
         )
         read_only_fields = (
             'id', 'status', 'created_at', 'updated_at', 'used_hours', 'purchased_hours', 'referent_instructor',
@@ -148,6 +149,13 @@ class StudentProfileSerializer(serializers.ModelSerializer):
 
     def get_dossier(self, obj):
         return Document.dossier(obj)
+
+    def get_formula(self, obj):
+        """Dernière formule payée (hors recharges / options) et sa date."""
+        p = obj.packages.filter(status='COMPLETED', parent__isnull=True).exclude(offer__category__in=['RECHARGE', 'OPTION']).select_related('offer').order_by('-paid_at').first()
+        if not p:
+            return None
+        return {'name': p.display_label, 'paid_at': p.paid_at, 'expires_at': p.expires_at, 'hours': p.hours_purchased}
 
 
 class InstructorPublicSerializer(serializers.ModelSerializer):
@@ -276,10 +284,12 @@ class RatingModerationSerializer(serializers.ModelSerializer):
 
 class AvailabilitySerializer(serializers.ModelSerializer):
     weekday_display = serializers.CharField(source='get_weekday_display', read_only=True)
+    meeting_point = serializers.PrimaryKeyRelatedField(queryset=MeetingPoint.objects.all(), required=False, allow_null=True)
+    meeting_point_name = serializers.CharField(source='meeting_point.name', read_only=True, default=None)
 
     class Meta:
         model = Availability
-        fields = ('id', 'weekday', 'weekday_display', 'start_time', 'end_time')
+        fields = ('id', 'weekday', 'weekday_display', 'start_time', 'end_time', 'meeting_point', 'meeting_point_name')
 
     def validate(self, data):
         if data['end_time'] <= data['start_time']:
@@ -309,6 +319,9 @@ class FreeWindowSerializer(serializers.Serializer):
     date = serializers.DateField()
     start_time = serializers.TimeField(format='%H:%M')
     end_time = serializers.TimeField(format='%H:%M')
+    meeting_point = serializers.IntegerField(allow_null=True, required=False)
+    meeting_point_name = serializers.CharField(allow_null=True, required=False)
+    meeting_point_address = serializers.CharField(allow_null=True, required=False)
 
 
 class BookingSerializer(serializers.Serializer):

@@ -13,7 +13,7 @@ from .models import (
     Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Invoice, Document, VehicleLog, log_activity,
 )
 from .permissions import IsInstructor, IsStaff, IsStudent, IsSupervisorOrAdmin
-from .scheduling import free_windows, is_window_free
+from .scheduling import availability_meeting_point, free_windows, is_window_free
 from .serializers import (
     UserSerializer, StudentProfileSerializer, InstructorPublicSerializer, InstructorProfileSerializer,
     AvailabilitySerializer, UnavailabilitySerializer, FreeWindowSerializer, BookingSerializer,
@@ -108,6 +108,24 @@ class InstructorViewSet(viewsets.ReadOnlyModelViewSet):
             s.is_valid(raise_exception=True)
             s.save()
         return Response(InstructorProfileSerializer(profile).data)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsInstructor])
+    def message(self, request):
+        """Contact direct d'un élève suivi (email et/ou SMS), tracé dans l'historique."""
+        from .tasks import send_bulk_message
+        try:
+            st = StudentProfile.objects.filter(Q(referent_instructor=request.user) | Q(booked_slots__instructor=request.user)).distinct().get(pk=request.data.get('student'))
+        except (StudentProfile.DoesNotExist, ValueError, TypeError):
+            return Response({'detail': "Cet élève n'est pas dans votre suivi."}, status=404)
+        channel = request.data.get('channel', 'email')
+        subject, body = (request.data.get('subject') or '').strip(), (request.data.get('body') or '').strip()
+        if not body or (channel != 'sms' and not subject):
+            return Response({'detail': 'Objet et message requis.'}, status=400)
+        if channel in ('sms', 'both') and not st.phone:
+            return Response({'detail': "Pas de numéro de mobile pour cet élève."}, status=400)
+        send_bulk_message.delay([st.user_id], subject or 'Message de votre moniteur', f"{body}\n\n— {request.user.get_full_name()}", channel)
+        log_activity('MESSAGE', f"{'SMS' if channel == 'sms' else 'Email'} de {request.user.get_full_name()} à {st.user.get_full_name()} : {subject or body[:40]}", actor=request.user, student=st, instructor=request.user)
+        return Response({'detail': 'Message envoyé.'})
 
     @action(detail=False, methods=['get'], permission_classes=[IsInstructor])
     def dashboard(self, request):
@@ -235,6 +253,9 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
             {
                 'instructor_id': w.instructor.id, 'instructor_name': w.instructor.get_full_name(), 'date': day,
                 'start_time': timezone.localtime(w.start).time(), 'end_time': timezone.localtime(w.end).time(),
+                'meeting_point': w.meeting_point.id if w.meeting_point else None,
+                'meeting_point_name': w.meeting_point.name if w.meeting_point else None,
+                'meeting_point_address': w.meeting_point.address if w.meeting_point else None,
             }
             for ins in instructors for w in free_windows(ins, day, duration_minutes=duration)
         ]
@@ -258,8 +279,10 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
             InstructorProfile.objects.select_for_update().get_or_create(user=d['instructor'])
             if not is_window_free(d['instructor'], d['date'], d['start_time'], d['end_time']):
                 return Response({'detail': "Ce créneau n'est plus disponible."}, status=status.HTTP_409_CONFLICT)
+            # Lieu : celui choisi par l'élève, sinon le lieu de prise en charge de la disponibilité du moniteur
+            place = d.get('meeting_point') or availability_meeting_point(d['instructor'], d['date'], d['start_time'], d['end_time'])
             slot = Slot.objects.create(
-                instructor=d['instructor'], student=profile, meeting_point=d.get('meeting_point'),
+                instructor=d['instructor'], student=profile, meeting_point=place,
                 date=d['date'], start_time=d['start_time'], end_time=d['end_time'], status='BOOKED',
             )
         send_booking_confirmation.delay(slot.id)

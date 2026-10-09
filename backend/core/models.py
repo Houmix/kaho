@@ -158,6 +158,7 @@ class Availability(models.Model):
     weekday = models.PositiveSmallIntegerField(choices=WEEKDAYS)
     start_time = models.TimeField()
     end_time = models.TimeField()
+    meeting_point = models.ForeignKey('MeetingPoint', on_delete=models.SET_NULL, null=True, blank=True, related_name='availabilities', verbose_name="Lieu de prise en charge")
 
     class Meta:
         ordering = ['weekday', 'start_time']

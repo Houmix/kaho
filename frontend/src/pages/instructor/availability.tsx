@@ -3,27 +3,29 @@ import api from '@/lib/api';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
 import MeetingPointsManager from '@/components/MeetingPointsManager';
-import { Availability, Unavailability, WEEKDAYS, apiError, hm } from '@/lib/types';
+import { Availability, MeetingPoint, Unavailability, WEEKDAYS, apiError, hm } from '@/lib/types';
 
 export default function AvailabilityPage() {
   const ready = useRequireAuth('INSTRUCTOR');
   const [avail, setAvail] = useState<Availability[]>([]);
   const [absences, setAbsences] = useState<Unavailability[]>([]);
-  const [slot, setSlot] = useState({ weekday: 0, start_time: '09:00', end_time: '12:00' });
+  const [slot, setSlot] = useState<{ weekday: number; start_time: string; end_time: string; meeting_point: string }>({ weekday: 0, start_time: '09:00', end_time: '12:00', meeting_point: '' });
+  const [points, setPoints] = useState<MeetingPoint[]>([]);
   const [absence, setAbsence] = useState({ start: '', end: '', reason: '' });
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    const [a, u] = await Promise.all([api.get('/availabilities/'), api.get('/unavailabilities/')]);
+    const [a, u, m] = await Promise.all([api.get('/availabilities/'), api.get('/unavailabilities/'), api.get('/meeting-points/')]);
     setAvail(a.data);
     setAbsences(u.data);
+    setPoints(m.data);
   }, []);
 
   useEffect(() => { if (ready) load(); }, [ready, load]);
 
   const addAvail = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
-    try { await api.post('/availabilities/', slot); await load(); }
+    try { await api.post('/availabilities/', { ...slot, meeting_point: slot.meeting_point ? Number(slot.meeting_point) : null }); await load(); }
     catch (err) { setError(apiError(err, 'Impossible d’ajouter ce créneau.')); }
   };
   const addAbsence = async (e: React.FormEvent) => {
@@ -51,6 +53,10 @@ export default function AvailabilityPage() {
             </select>
             <input type="time" value={slot.start_time} onChange={(e) => setSlot({ ...slot, start_time: e.target.value })} className="input-field" required />
             <input type="time" value={slot.end_time} onChange={(e) => setSlot({ ...slot, end_time: e.target.value })} className="input-field" required />
+            <select value={slot.meeting_point} onChange={(e) => setSlot({ ...slot, meeting_point: e.target.value })} className="input-field col-span-3 sm:col-span-2" aria-label="Lieu de prise en charge">
+              <option value="">Lieu de prise en charge : à convenir</option>
+              {points.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.address}</option>)}
+            </select>
             <button type="submit" className="btn-primary col-span-3 sm:col-span-1">Ajouter</button>
           </form>
           <ul className="divide-y divide-cream-200">
@@ -59,8 +65,8 @@ export default function AvailabilityPage() {
                 <span className="w-24 shrink-0 font-medium">{name}</span>
                 <div className="flex flex-wrap gap-2 flex-1">
                   {items.length === 0 ? <span className="text-brown-800/40 text-sm">—</span> : items.map((a) => (
-                    <span key={a.id} className="badge bg-cream-200 text-brown-800 inline-flex items-center gap-2">
-                      {hm(a.start_time)}–{hm(a.end_time)}
+                    <span key={a.id} className="badge bg-cream-200 text-brown-800 inline-flex items-center gap-2" title={a.meeting_point_name ? `Lieu : ${a.meeting_point_name}` : 'Lieu à convenir'}>
+                      {hm(a.start_time)}–{hm(a.end_time)}{a.meeting_point_name && <span className="text-brown-800/60">· {a.meeting_point_name}</span>}
                       <button onClick={() => remove(`/availabilities/${a.id}/`)} aria-label="Supprimer" className="text-brown-800/50 hover:text-red-600">×</button>
                     </span>
                   ))}

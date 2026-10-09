@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
 import ProgressGauge from '@/components/ProgressGauge';
-import { Lesson, StudentProfile } from '@/lib/types';
+import { Lesson, Slot, StudentProfile, frDate, hm } from '@/lib/types';
 import { ExamStats } from '@/lib/lms';
 import { ReadinessGauge } from '@/components/LmsAnalytics';
 
@@ -22,13 +22,21 @@ export default function StudentDashboard() {
   const [toRate, setToRate] = useState<Lesson[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<ExamStats | null>(null);
+  const [upcoming, setUpcoming] = useState<Slot[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const { user } = useAuth();
   const ready = useRequireAuth('STUDENT');
 
   useEffect(() => {
     if (!ready) return;
-    Promise.all([api.get('/student-profiles/my_profile/'), api.get('/lessons/to_rate/')])
-      .then(([p, t]) => { setProfile(p.data); setToRate(t.data); if (p.data.has_lms_access) api.get('/lms/exam-attempts/stats/').then((r) => setStats(r.data)).catch(() => {}); })
+    Promise.all([api.get('/student-profiles/my_profile/'), api.get('/lessons/to_rate/'), api.get('/slots/'), api.get('/lessons/')])
+      .then(([p, t, s, l]) => {
+        setProfile(p.data); setToRate(t.data);
+        const today = new Date().toISOString().slice(0, 10);
+        setUpcoming((s.data.results ?? s.data).filter((x: Slot) => x.status === 'BOOKED' && x.date >= today).sort((a: Slot, b: Slot) => (a.date + a.start_time).localeCompare(b.date + b.start_time)));
+        setLessons(l.data.results ?? l.data);
+        if (p.data.has_lms_access) api.get('/lms/exam-attempts/stats/').then((r) => setStats(r.data)).catch(() => {});
+      })
       .catch((e) => console.error(e))
       .finally(() => setIsLoading(false));
   }, [ready]);
@@ -62,18 +70,17 @@ export default function StudentDashboard() {
             <Link href="/student/notebook" className="text-sm text-brown-700 hover:underline mt-3 inline-block">Voir le livret →</Link>
           </div>
           <div className="card">
-            <h2 className="text-xl mb-4">Votre progression</h2>
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-brown-800/70">Heures effectuées</span>
-              <span className="font-semibold">{profile.used_hours.toFixed(1)} h / {profile.purchased_hours.toFixed(1)} h</span>
+            <h2 className="text-xl mb-3">Mes heures</h2>
+            <p className="text-4xl font-display text-brown-700">{profile.bookable_hours.toFixed(1)} h <span className="text-base font-sans text-brown-800/70">disponibles</span></p>
+            <dl className="text-sm mt-3 space-y-1">
+              <div className="flex justify-between"><dt className="text-brown-800/70">Réservées (à venir)</dt><dd>{profile.reserved_hours.toFixed(1)} h</dd></div>
+              <div className="flex justify-between"><dt className="text-brown-800/70">Effectuées</dt><dd>{profile.used_hours.toFixed(1)} h</dd></div>
+              <div className="flex justify-between border-t border-cream-200 pt-1"><dt className="text-brown-800/70">Achetées</dt><dd className="font-semibold">{profile.purchased_hours.toFixed(1)} h</dd></div>
+            </dl>
+            <div className="w-full bg-cream-200 rounded-full h-2 mt-3" title="Heures effectuées sur le total acheté">
+              <div className="bg-brown-700 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
             </div>
-            <div className="w-full bg-cream-200 rounded-full h-2.5">
-              <div className="bg-brown-700 h-2.5 rounded-full transition-all" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="mt-3 text-brown-800/70">
-              Il vous reste <strong className="text-brown-900">{profile.remaining_hours.toFixed(1)} h</strong>
-              {profile.reserved_hours > 0 && <span className="text-sm"> dont {profile.reserved_hours.toFixed(1)} h déjà réservées</span>}
-            </p>
+            {profile.formula && <p className="text-xs text-brown-800/60 mt-2">Formule : {profile.formula.name}</p>}
             {profile.referent_instructor_name && <p className="text-sm text-brown-800/60 mt-1">Moniteur référent : {profile.referent_instructor_name}</p>}
           </div>
 
@@ -104,6 +111,33 @@ export default function StudentDashboard() {
             </div>
           </Link>
         )}
+
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <section className="card">
+            <div className="flex items-center justify-between mb-3"><h2 className="text-xl">Mes leçons à venir</h2><Link href="/student/reservation" className="text-sm text-brown-700 hover:underline">Réserver →</Link></div>
+            {upcoming.length === 0 ? <p className="text-sm text-brown-800/60">Aucune leçon réservée.</p> : (
+              <ul className="divide-y divide-cream-200 text-sm">{upcoming.slice(0, 6).map((s) => (
+                <li key={s.id} className="py-2">
+                  <div className="font-semibold">{frDate(s.date, { weekday: 'long', day: 'numeric', month: 'long' })} · {hm(s.start_time)}–{hm(s.end_time)}</div>
+                  <div className="text-brown-800/70">{s.instructor_name} · {s.meeting_point_name}</div>
+                </li>
+              ))}</ul>
+            )}
+          </section>
+          <section className="card">
+            <div className="flex items-center justify-between mb-3"><h2 className="text-xl">Historique de mes leçons</h2><Link href="/student/notebook" className="text-sm text-brown-700 hover:underline">Livret →</Link></div>
+            {lessons.length === 0 ? <p className="text-sm text-brown-800/60">Aucune leçon effectuée pour le moment.</p> : (
+              <ul className="divide-y divide-cream-200 text-sm">{lessons.slice(0, 6).map((l) => (
+                <li key={l.id} className="py-2">
+                  <Link href={`/student/lesson/${l.id}`} className="block hover:bg-cream-50 -mx-2 px-2 rounded-lg">
+                    <div className="flex items-center justify-between gap-2"><span className="font-semibold">{frDate(l.slot.date, { day: 'numeric', month: 'short', year: 'numeric' })} · {hm(l.slot.start_time)}</span>{!l.attended ? <span className="badge bg-red-100 text-red-700">absent</span> : l.rating ? <span className="text-caramel text-xs">{'★'.repeat(l.rating.score)}</span> : <span className="badge bg-caramel text-brown-900">à noter</span>}</div>
+                    <div className="text-brown-800/70">{l.instructor_name} · {l.assessments.length} compétence(s) travaillée(s) · <span className="text-brown-700">voir le bilan →</span></div>
+                  </Link>
+                </li>
+              ))}</ul>
+            )}
+          </section>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-6">
           {links.map((l) => (

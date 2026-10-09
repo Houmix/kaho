@@ -122,10 +122,10 @@ export default function Reservation() {
             {windows.map((w) => {
               const active = selected === w;
               return (
-                <button key={`${w.instructor_id}-${w.start_time}`} onClick={() => setSelected(w)}
+                <button key={`${w.instructor_id}-${w.start_time}`} onClick={() => { setSelected(w); if (w.meeting_point) setPointId(w.meeting_point); }}
                   className={`text-left rounded-xl border px-3 py-2 ${active ? 'bg-brown-700 text-cream-50 border-brown-700' : 'bg-white border-cream-300 hover:border-brown-300'}`}>
                   <div className="font-semibold">{w.start_time} – {w.end_time}</div>
-                  <div className={`text-xs ${active ? 'text-cream-200' : 'text-brown-800/60'}`}>{w.instructor_name}</div>
+                  <div className={`text-xs ${active ? 'text-cream-200' : 'text-brown-800/60'}`}>{w.instructor_name}{w.meeting_point_name && ` · ${w.meeting_point_name}`}</div>
                 </button>
               );
             })}
@@ -135,6 +135,7 @@ export default function Reservation() {
 
       <section className="card mb-10">
         <h2 className="text-xl mb-3">3. Point de rendez-vous</h2>
+        {selected?.meeting_point_name && <p className="text-sm text-brown-800/70 mb-2">Lieu de prise en charge prévu par {selected.instructor_name} : <strong>{selected.meeting_point_name}</strong>{selected.meeting_point_address && ` — ${selected.meeting_point_address}`}</p>}
         {points.length === 0 ? (
           <p className="text-brown-800/60">Lieu à convenir avec votre moniteur : il vous contactera pour fixer le point de rendez-vous.</p>
         ) : (

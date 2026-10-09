@@ -12,6 +12,7 @@ class Window:
     instructor: User
     start: datetime
     end: datetime
+    meeting_point: object = None  # MeetingPoint de la disponibilité (lieu de prise en charge), ou None
 
 
 def _aware(d: date, t: time) -> datetime:
@@ -41,14 +42,20 @@ def free_windows(instructor: User, day: date, duration_minutes: int = 60, step_m
     earliest = timezone.now() + timedelta(hours=settings.BOOKING_MIN_NOTICE_HOURS)
     busy = busy_periods(instructor, day)
     windows = []
-    for a in Availability.objects.filter(instructor=instructor, weekday=day.weekday()):
+    for a in Availability.objects.filter(instructor=instructor, weekday=day.weekday()).select_related('meeting_point'):
         cursor, end = _aware(day, a.start_time), _aware(day, a.end_time)
         while cursor + duration <= end:
             w_end = cursor + duration
             if cursor >= earliest and not any(_overlaps(cursor, w_end, b0, b1) for b0, b1 in busy):
-                windows.append(Window(instructor, cursor, w_end))
+                windows.append(Window(instructor, cursor, w_end, a.meeting_point))
             cursor += step
     return windows
+
+
+def availability_meeting_point(instructor: User, day: date, start: time, end: time):
+    """Lieu de prise en charge défini sur la disponibilité qui couvre ce créneau (si renseigné)."""
+    a = Availability.objects.filter(instructor=instructor, weekday=day.weekday(), start_time__lte=start, end_time__gte=end).select_related('meeting_point').first()
+    return a.meeting_point if a else None
 
 
 def is_window_free(instructor: User, day: date, start: time, end: time) -> bool:
