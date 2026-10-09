@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import api from '@/lib/api';
 import { STAFF_ROLES, useRequireAuth } from '@/hooks/useRequireAuth';
+import { useAuth } from '@/hooks/useAuth';
 import AppShell from '@/components/AppShell';
 import ProgressGauge from '@/components/ProgressGauge';
 import BackLink from '@/components/BackLink';
@@ -12,6 +13,8 @@ import { Logbook, STATUS_LABELS, Slot, apiError, frDate, hm } from '@/lib/types'
 export default function InstructorStudentSheet() {
   const ready = useRequireAuth(STAFF_ROLES);
   const router = useRouter();
+  const { user } = useAuth();
+  const isBackoffice = user?.role === 'SUPERVISOR' || user?.role === 'ADMIN' || user?.role === 'OWNER';
   const id = typeof router.query.id === 'string' ? router.query.id : null;
   const [lb, setLb] = useState<Logbook | null>(null);
   const [upcoming, setUpcoming] = useState<Slot[]>([]);
@@ -47,6 +50,7 @@ export default function InstructorStudentSheet() {
           <p className="text-brown-800/70">{s.user.email}{s.phone && ` · ${s.phone}`} · boîte {s.license_type === 'AUTO' ? 'automatique' : 'manuelle'}{s.referent_instructor_name && ` · référent : ${s.referent_instructor_name}`}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {isBackoffice && <Link href={`/admin/students/${id}`} className="btn-secondary !py-1.5 text-sm">Dossier apprenant (administratif)</Link>}
           {s.phone && <a href={`tel:${s.phone}`} className="btn-secondary !py-1.5 text-sm">📞 Appeler</a>}
           {s.phone && <a href={`sms:${s.phone}`} className="btn-secondary !py-1.5 text-sm">💬 SMS</a>}
           <a href={`mailto:${s.user.email}`} className="btn-secondary !py-1.5 text-sm">✉ Email</a>

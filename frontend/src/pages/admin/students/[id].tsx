@@ -2,9 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import api from '@/lib/api';
-import { BACKOFFICE, STAFF_ROLES, useRequireAuth } from '@/hooks/useRequireAuth';
-import { useAuth } from '@/hooks/useAuth';
-import InstructorStudentSheet from '@/components/InstructorStudentSheet';
+import { BACKOFFICE, useRequireAuth } from '@/hooks/useRequireAuth';
 import AdminShell from '@/components/AdminShell';
 import ProgressGauge from '@/components/ProgressGauge';
 import PdfLink from '@/components/PdfLink';
@@ -70,7 +68,7 @@ function BookForStudent({ studentId, onDone }: { studentId: number; onDone: (tex
   );
 }
 
-function AdminStudentSheet() {
+export default function AdminStudentDetail() {
   const ready = useRequireAuth(BACKOFFICE);
   const router = useRouter();
   const id = typeof router.query.id === 'string' ? router.query.id : null;
@@ -120,6 +118,7 @@ function AdminStudentSheet() {
           <span className={`badge ${statusOf(s.status).cls}`}>{s.status_display}</span>
           {s.ready_for_exam && <span className="badge bg-caramel text-brown-900">Prêt pour l'examen</span>}
           {s.has_lms_access && <span className="badge bg-brown-700 text-cream-50">Code en ligne</span>}
+          <Link href={`/instructor/students/${id}?from=apprenant`} className="btn-secondary !py-1.5 text-sm">Fiche élève (suivi pédagogique)</Link>
           <button onClick={() => downloadFile(`/admin/students/${id}/contract/`, `contrat-${s.user.last_name.toLowerCase()}.pdf`)} className="btn-secondary !py-1.5 text-sm">Contrat PDF</button>
         </div>
       </div>
@@ -310,12 +309,4 @@ function AdminStudentSheet() {
       )}
     </AdminShell>
   );
-}
-
-/** Fiche élève unique : le back-office voit le dossier complet, un moniteur le suivi pédagogique. */
-export default function StudentSheetPage() {
-  const ready = useRequireAuth(STAFF_ROLES);
-  const { user } = useAuth();
-  if (!ready || !user) return null;
-  return ['SUPERVISOR', 'ADMIN', 'OWNER'].includes(user.role) ? <AdminStudentSheet /> : <InstructorStudentSheet />;
 }
