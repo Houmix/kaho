@@ -1,75 +1,42 @@
-const CACHE_NAME = 'kaho-v1';
-const urlsToCache = [
-  '/',
-  '/offline',
-];
+// Stratégie « réseau d'abord » : le cache ne sert qu'en secours hors-ligne, jamais à la place d'une version plus récente.
+const CACHE_NAME = 'kaho-v2';
+const PRECACHE = ['/', '/offline'];
 
-self.addEventListener('install', event => {
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE).catch(() => undefined)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting())
+    caches.keys().then((names) => Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)))).then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', event => {
+self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
-
-  if (url.pathname === '/offline') {
+  // Jamais d'interception : autres origines (API, CDN), méthodes non-GET, rechargement à chaud du dev server
+  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/_next/webpack-hmr') || url.pathname.startsWith('/api/')) {
     return;
   }
-
-  if (request.method === 'GET') {
-    event.respondWith(
-      caches.match(request)
-        .then(response => {
-          if (response) {
-            return response;
-          }
-
-          return fetch(request).then(response => {
-            if (!response || response.status !== 200 || response.type === 'error') {
-              return response;
-            }
-
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(request, responseToCache);
-              });
-
-            return response;
-          }).catch(() => {
-            if (url.pathname.startsWith('/api/')) {
-              return new Response(JSON.stringify({ error: 'offline' }), {
-                status: 503,
-                headers: { 'Content-Type': 'application/json' }
-              });
-            }
-            return caches.match('/offline');
-          });
-        })
-    );
-  }
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      })
+      .catch(async () => {
+        const cached = await caches.match(request);
+        if (cached) return cached;
+        if (request.mode === 'navigate') return caches.match('/offline');
+        return Response.error();
+      })
+  );
 });
 
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
