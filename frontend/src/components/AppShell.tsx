@@ -26,6 +26,7 @@ export default function AppShell({ title, children }: { title: string; children:
     return <AdminShell title={title} wide>{children}</AdminShell>;
   }
   const nav = user?.role === 'STUDENT' ? STUDENT_NAV : INSTRUCTOR_NAV;
+  const home = user?.role === 'STUDENT' ? '/student/dashboard' : '/instructor/dashboard';
   const linkCls = (href: string) =>
     `px-3 py-2 rounded-full text-sm font-medium ${router.pathname === href || (href === '/code' && router.pathname.startsWith('/code')) ? 'bg-brown-700 text-cream-50' : 'text-brown-800 hover:bg-cream-200'}`;
 
@@ -42,7 +43,12 @@ export default function AppShell({ title, children }: { title: string; children:
         </div>
       </header>
 
-      <main className="container py-6 pb-24 sm:pb-10">{children}</main>
+      <main className="container py-6 pb-24 sm:pb-10">
+        {router.pathname !== home && (
+          <Link href={home} className="inline-flex items-center gap-1 text-sm text-brown-700 hover:underline mb-4">← Retour au tableau de bord</Link>
+        )}
+        {children}
+      </main>
 
       <nav className="sm:hidden fixed bottom-0 inset-x-0 bg-white border-t border-cream-200 flex">
         {nav.map((n) => (

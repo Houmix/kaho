@@ -5,6 +5,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
 import OfferCard from '@/components/OfferCard';
 import PdfLink from '@/components/PdfLink';
+import OfferConfigurator from '@/components/OfferConfigurator';
 import { CATEGORY_LABELS, Offer, OfferCategory, Package, formatPrice } from '@/lib/offers';
 import { StudentProfile, frDate } from '@/lib/types';
 
@@ -23,6 +24,7 @@ export default function Purchases() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [category, setCategory] = useState<OfferCategory | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
+  const [configuring, setConfiguring] = useState<Offer | null>(null);
   const [message, setMessage] = useState('');
 
   const load = () => Promise.all([
@@ -45,21 +47,17 @@ export default function Purchases() {
     }
   }, [preselected, offers]);
 
-  const choose = async (offer: Offer) => {
-    setBusy(offer.id);
-    setMessage('');
-    try {
-      await api.post('/packages/', { offer: offer.id });
-      await load();
-      setMessage(`Demande enregistrée pour « ${offer.name} ». Vos accès et vos heures seront crédités dès validation du paiement.`);
-    } catch {
-      setMessage("Impossible d'enregistrer la demande. Réessayez.");
-    } finally { setBusy(null); }
+  const choose = (offer: Offer) => { setMessage(''); setConfiguring(offer); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const payOnline = async (p: Package) => {
+    setBusy(p.id); setMessage('');
+    try { const r = await api.post(`/packages/${p.id}/checkout/`); window.location.href = r.data.url; }
+    catch (err: any) { setMessage(err?.response?.data?.detail || 'Paiement en ligne indisponible.'); }
+    finally { setBusy(null); }
   };
 
   const hasFormula = packages.some((p) => p.status === 'COMPLETED' && p.offer_category !== 'RECHARGE');
-  const categories = (Object.keys(CATEGORY_LABELS) as OfferCategory[]).filter((c) => offers.some((o) => o.category === c));
-  const visible = offers.filter((o) => !category || o.category === category);
+  const categories = (Object.keys(CATEGORY_LABELS) as OfferCategory[]).filter((c) => c !== 'OPTION' && offers.some((o) => o.category === c && !o.is_addon));
+  const visible = offers.filter((o) => !o.is_addon && (!category || o.category === category));
 
   return (
     <AppShell title="Mes offres">
@@ -79,6 +77,7 @@ export default function Purchases() {
       )}
 
       {message && <div className="card mb-8 border-brown-300 bg-brown-50">{message}</div>}
+      {configuring && <OfferConfigurator base={configuring} offers={offers} onDone={(text, ok = true) => { setMessage(text); if (ok) { setConfiguring(null); load(); } }} onCancel={() => setConfiguring(null)} />}
 
       {categories.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-6">
@@ -96,7 +95,7 @@ export default function Purchases() {
           <OfferCard key={o.id} offer={o} highlight={o.id === preselected || (preselected === null && o.is_featured)}
             action={
               <button onClick={() => choose(o)} disabled={busy !== null} className={`${o.id === preselected ? 'btn-primary' : 'btn-secondary'} w-full disabled:opacity-60`}>
-                {busy === o.id ? 'Enregistrement…' : 'Choisir cette offre'}
+                {configuring?.id === o.id ? 'Formule sélectionnée' : 'Choisir cette offre'}
               </button>
             } />
         ))}
@@ -123,11 +122,11 @@ export default function Purchases() {
               {packages.map((p) => (
                 <tr key={p.id} className="border-t border-cream-200">
                   <td className="py-3 px-4">{new Date(p.created_at).toLocaleDateString('fr-FR')}</td>
-                  <td className="py-3 px-4">{p.display_label}</td>
+                  <td className="py-3 px-4">{p.display_label}{p.addon_items?.length > 0 && <ul className="text-xs text-brown-800/60">{p.addon_items.map((a) => <li key={a.id}>+ {a.label}</li>)}</ul>}{p.requested_skills?.length > 0 && <p className="text-xs text-brown-800/60">Compétences : {p.requested_skills.join(', ')}</p>}</td>
                   <td className="py-3 px-4">{[p.hours_purchased > 0 ? `${p.hours_purchased} h` : null, p.includes_lms ? 'Code en ligne' : null].filter(Boolean).join(' + ') || '—'}</td>
-                  <td className="py-3 px-4">{formatPrice(p.amount_paid)}</td>
+                  <td className="py-3 px-4">{formatPrice(p.bundle_total ?? p.amount_paid)}{p.installments > 1 && <div className="text-xs text-brown-800/60">{p.installments_paid}/{p.installments} échéance(s)</div>}</td>
                   <td className="py-3 px-4">{p.expires_at ? frDate(p.expires_at, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
-                  <td className="py-3 px-4"><span className={`badge ${statusCls[p.status]}`}>{p.status_display}</span>{p.status === 'PENDING' && p.stripe_checkout_url && <><br /><a href={p.stripe_checkout_url} className="btn-primary !py-1 !px-3 text-xs mt-1 inline-block">Payer en ligne</a></>}</td>
+                  <td className="py-3 px-4"><span className={`badge ${statusCls[p.status]}`}>{p.status_display}</span>{p.status === 'PENDING' && <><br /><button onClick={() => payOnline(p)} disabled={busy === p.id} className="btn-primary !py-1 !px-3 text-xs mt-1">{busy === p.id ? '…' : 'Payer en ligne'}</button></>}</td>
                   <td className="py-3 px-4">{p.invoice_id && p.invoice_number ? <PdfLink invoiceId={p.invoice_id} number={p.invoice_number} /> : <span className="text-brown-800/40">—</span>}</td>
                 </tr>
               ))}

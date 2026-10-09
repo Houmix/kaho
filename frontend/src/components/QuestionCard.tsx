@@ -26,6 +26,12 @@ export default function QuestionCard({ index, q, value, onChange, correction, di
         {correction && <span className={`badge shrink-0 ${correction.correct ? 'bg-brown-700 text-cream-50' : 'bg-red-100 text-red-700'}`}>{correction.correct ? 'Correct' : 'Incorrect'}</span>}
       </div>
       <Markdown className="prose-compact mb-4">{q.text_md}</Markdown>
+      {q.image_url && <img src={q.image_url} alt="" className="rounded-xl border border-cream-200 max-h-72 w-auto mb-4" />}
+      {q.video_url && (
+        <div className="aspect-video rounded-xl overflow-hidden bg-brown-900 mb-4 max-w-xl">
+          {q.video_is_file ? <video src={q.video_url} controls playsInline className="w-full h-full" /> : <iframe src={q.video_embed} title="Vidéo" className="w-full h-full" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />}
+        </div>
+      )}
 
       {q.kind === 'SHORT' || q.kind === 'CODE' ? (
         <>

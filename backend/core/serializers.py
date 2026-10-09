@@ -441,14 +441,21 @@ class OfferSerializer(serializers.ModelSerializer):
     price_per_hour = serializers.FloatField(read_only=True)
     category_display = serializers.CharField(source='get_category_display', read_only=True)
     billing_display = serializers.CharField(source='get_billing_type_display', read_only=True)
+    installments = serializers.IntegerField(read_only=True)
+    skills = serializers.SlugRelatedField(many=True, slug_field='code', queryset=Competency.objects.all(), required=False)
+    skill_labels = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
         fields = (
             'id', 'name', 'description', 'category', 'category_display', 'hours', 'price', 'price_per_hour',
-            'billing_type', 'billing_display', 'includes_lms', 'validity_months',
+            'billing_type', 'billing_display', 'billing_interval_months', 'installments', 'includes_lms', 'includes_exams', 'validity_months',
+            'is_addon', 'skills', 'skill_labels', 'lets_student_pick_skills',
             'for_code_status', 'for_level', 'gearbox', 'is_featured',
         )
+
+    def get_skill_labels(self, obj):
+        return [f"{c.code} {c.label}" for c in obj.skills.all()]
 
 
 class OfferAdminSerializer(serializers.ModelSerializer):
@@ -456,10 +463,13 @@ class OfferAdminSerializer(serializers.ModelSerializer):
     billing_display = serializers.CharField(source='get_billing_type_display', read_only=True)
     sales = serializers.SerializerMethodField()
 
+    skills = serializers.SlugRelatedField(many=True, slug_field='code', queryset=Competency.objects.all(), required=False)
+
     class Meta:
         model = Offer
-        fields = ('id', 'name', 'description', 'category', 'category_display', 'hours', 'price', 'billing_type', 'billing_display', 'includes_lms',
-                  'validity_months', 'for_code_status', 'for_level', 'gearbox', 'is_featured', 'is_active', 'display_order', 'sales', 'created_at')
+        fields = ('id', 'name', 'description', 'category', 'category_display', 'hours', 'price', 'billing_type', 'billing_display', 'billing_interval_months',
+                  'includes_lms', 'includes_exams', 'validity_months', 'is_addon', 'skills', 'lets_student_pick_skills',
+                  'for_code_status', 'for_level', 'gearbox', 'is_featured', 'is_active', 'display_order', 'sales', 'created_at')
         read_only_fields = ('id', 'created_at')
 
     def get_sales(self, obj):
@@ -475,6 +485,11 @@ class RecommendationInputSerializer(serializers.Serializer):
 class PackageSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.user.get_full_name', read_only=True)
     offer = serializers.PrimaryKeyRelatedField(queryset=Offer.objects.filter(is_active=True))
+    addons = serializers.PrimaryKeyRelatedField(queryset=Offer.objects.filter(is_active=True, is_addon=True), many=True, required=False, write_only=True)
+    skills = serializers.ListField(child=serializers.CharField(), required=False, write_only=True)
+    addon_items = serializers.SerializerMethodField()
+    bundle_total = serializers.SerializerMethodField()
+    installments = serializers.IntegerField(source='offer.installments', read_only=True, default=1)
     offer_name = serializers.CharField(source='offer.name', read_only=True)
     offer_category = serializers.CharField(source='offer.category', read_only=True)
     includes_lms = serializers.BooleanField(source='offer.includes_lms', read_only=True)
@@ -484,20 +499,49 @@ class PackageSerializer(serializers.ModelSerializer):
     invoice_id = serializers.IntegerField(source='invoice.id', read_only=True, default=None)
     invoice_number = serializers.CharField(source='invoice.number', read_only=True, default=None)
 
+    def get_addon_items(self, obj):
+        return [{'id': a.id, 'label': a.display_label, 'amount': str(a.amount_paid), 'status': a.status} for a in obj.addons.all()] if obj.parent_id is None else []
+
+    def get_bundle_total(self, obj):
+        return str(sum((p.amount_paid for p in obj.bundle), 0)) if obj.parent_id is None else str(obj.amount_paid)
+
+    def validate(self, data):
+        offer = data.get('offer')
+        skills = data.get('skills') or []
+        if skills:
+            pickers = [o for o in [offer, *(data.get('addons') or [])] if o and o.lets_student_pick_skills]
+            if not pickers:
+                raise serializers.ValidationError({'skills': "Cette formule ne permet pas de choisir les compétences."})
+            allowed = set()
+            for o in pickers:
+                allowed |= set(o.skills.values_list('code', flat=True)) or set(Competency.objects.values_list('code', flat=True))
+            bad = [c for c in skills if c not in allowed]
+            if bad:
+                raise serializers.ValidationError({'skills': f"Compétences inconnues : {', '.join(bad)}"})
+        return data
+
     def create(self, validated_data):
+        """Formule de base + options (une ligne par option, rattachée à la base) + compétences choisies."""
+        addons = validated_data.pop('addons', [])
+        skills = validated_data.pop('skills', [])
         offer = validated_data['offer']
         validated_data['hours_purchased'] = offer.hours
         validated_data['amount_paid'] = offer.price
-        return super().create(validated_data)
+        validated_data['requested_skills'] = skills
+        base = super().create(validated_data)
+        for a in addons:
+            Package.objects.create(student=base.student, offer=a, parent=base, hours_purchased=a.hours, amount_paid=a.price, status=base.status)
+        return base
 
     class Meta:
         model = Package
         fields = (
             'id', 'student', 'student_name', 'offer', 'offer_name', 'offer_category', 'includes_lms', 'label', 'display_label',
-            'hours_purchased', 'amount_paid', 'status', 'status_display', 'payment_method', 'payment_method_display',
-            'stripe_checkout_url', 'paid_at', 'expires_at', 'note', 'invoice_id', 'invoice_number', 'created_at', 'updated_at',
+            'hours_purchased', 'amount_paid', 'status', 'status_display', 'payment_method', 'payment_method_display', 'installments', 'installments_paid',
+            'stripe_checkout_url', 'paid_at', 'expires_at', 'note', 'invoice_id', 'invoice_number', 'parent', 'addons', 'addon_items', 'bundle_total',
+            'skills', 'requested_skills', 'created_at', 'updated_at',
         )
-        read_only_fields = ('id', 'student', 'label', 'hours_purchased', 'amount_paid', 'status', 'payment_method', 'stripe_checkout_url', 'paid_at', 'expires_at', 'note', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'student', 'label', 'hours_purchased', 'amount_paid', 'status', 'payment_method', 'stripe_checkout_url', 'paid_at', 'expires_at', 'note', 'parent', 'requested_skills', 'installments_paid', 'created_at', 'updated_at')
 
 
 # ---------- Divers ----------

@@ -423,10 +423,27 @@ class PackageViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.role in User.STAFF_ROLES:
             return Package.objects.select_related('student__user', 'offer')
+        if self.action == 'list':
+            return Package.objects.filter(student__user=user, parent__isnull=True).select_related('offer').prefetch_related('addons__offer')
         return Package.objects.filter(student__user=user).select_related('offer')
 
     def perform_create(self, serializer):
         serializer.save(student=StudentProfile.objects.get(user=self.request.user))
+
+    @action(detail=True, methods=['post'], permission_classes=[IsStudent])
+    def checkout(self, request, pk=None):
+        """Lien de paiement en ligne (Stripe) pour une demande en attente : formule + options, unique / abonnement / en plusieurs fois."""
+        from .payments import StripeNotConfigured, create_checkout_link
+        pkg = self.get_object()
+        if pkg.status != 'PENDING':
+            return Response({'detail': 'Cet achat est déjà réglé ou annulé.'}, status=400)
+        try:
+            url = create_checkout_link(pkg)
+        except StripeNotConfigured:
+            return Response({'detail': "Le paiement en ligne n'est pas encore activé : réglez auprès de votre école (virement, chèque, espèces, CPF)."}, status=400)
+        except Exception as e:
+            return Response({'detail': f"Paiement en ligne indisponible : {e}"}, status=502)
+        return Response({'url': url})
 
 
 class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):

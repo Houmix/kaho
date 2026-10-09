@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .admin_views import (
-    AdminCourseViewSet, AdminExamViewSet, AdminLessonViewSet, AdminQuestionViewSet, AdminQuizViewSet, AdminSectionViewSet, ThemesView,
+    AdminCourseViewSet, AdminExamViewSet, AdminLessonViewSet, AdminQuestionViewSet, AdminQuizViewSet, AdminSectionViewSet, MediaUploadView, ThemesView,
 )
 from .views import (
     AdminLmsOverviewView, AdminStudentLmsView, CourseViewSet, DemoView, ExamAttemptViewSet, ExamViewSet, LessonViewSet, QuizViewSet, RevisionView,
@@ -26,5 +26,6 @@ urlpatterns = router.urls + [
     path('revision/', RevisionView.as_view(), name='lms-revision'),
     path('admin/overview/', AdminLmsOverviewView.as_view(), name='lms-admin-overview'),
     path('admin/themes/', ThemesView.as_view(), name='lms-admin-themes'),
+    path('admin/upload/', MediaUploadView.as_view(), name='lms-admin-upload'),
     path('admin/students/<int:student_id>/', AdminStudentLmsView.as_view(), name='lms-admin-student'),
 ]

@@ -7,6 +7,7 @@ import AdminShell from '@/components/AdminShell';
 import Markdown from '@/components/Markdown';
 import { AdminCourse, AdminLesson } from '@/lib/lms';
 import { apiError } from '@/lib/types';
+import { useUnsavedGuard } from '@/hooks/useUnsavedGuard';
 
 export default function AdminLessonEditor() {
   const ready = useRequireAuth(BACKOFFICE);
@@ -21,7 +22,8 @@ export default function AdminLessonEditor() {
   const ta = useRef<HTMLTextAreaElement>(null);
   const load = useCallback(() => id && api.get(`/lms/admin/lessons/${id}/`).then((r) => { setL(r.data); setF(r.data); }), [id]);
   useEffect(() => { if (ready && id) { load(); api.get('/lms/admin/courses/').then((r) => setCourses(r.data)); } }, [ready, id, load]);
-  const dirty = l && JSON.stringify(f) !== JSON.stringify(l);
+  const dirty = !!l && JSON.stringify(f) !== JSON.stringify(l);
+  useUnsavedGuard(dirty);
   const save = async () => {
     setBusy(true); setMsg(null);
     try { const r = await api.patch(`/lms/admin/lessons/${id}/`, f); setL(r.data); setF(r.data); setMsg({ ok: true, text: 'Leçon enregistrée.' }); }
@@ -78,6 +80,10 @@ export default function AdminLessonEditor() {
       <div className={`grid gap-4 ${preview ? 'lg:grid-cols-2' : ''}`}>
         <textarea ref={ta} value={f.content_md ?? ''} onChange={(e) => setF({ ...f, content_md: e.target.value })} rows={28} spellCheck={false} className="input-field font-mono text-sm leading-relaxed" placeholder="Contenu de la leçon en Markdown…" />
         {preview && <div className="card overflow-auto max-h-[42rem]"><Markdown>{f.content_md || '*Aperçu vide*'}</Markdown></div>}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-4 border-t border-cream-200 pt-4">
+        <Link href={course ? `/admin/lms/course/${course.id}` : '/admin/lms'} className="text-sm text-brown-700 hover:underline">← Annuler / retour au cours</Link>
+        <button onClick={save} disabled={!dirty || busy} className="btn-primary !py-1.5 text-sm disabled:opacity-50">{busy ? 'Enregistrement…' : dirty ? 'Enregistrer' : 'Enregistré'}</button>
       </div>
       <p className="text-xs text-brown-800/50 mt-3">{l.completions} élève(s) ont terminé cette leçon. <button onClick={() => confirm('Supprimer cette leçon ?') && api.delete(`/lms/admin/lessons/${id}/`).then(() => router.push(course ? `/admin/lms/course/${course.id}` : '/admin/lms'))} className="text-red-700 hover:underline">Supprimer la leçon</button></p>
     </AdminShell>

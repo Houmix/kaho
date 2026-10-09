@@ -155,13 +155,16 @@ class ChoiceAdminSerializer(serializers.ModelSerializer):
 
 class QuestionAdminSerializer(serializers.ModelSerializer):
     choices = ChoiceAdminSerializer(many=True, required=False)
+    # URLs internes (médias téléversés) : pas de validation stricte de nom de domaine
+    image_url = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    video_url = serializers.CharField(required=False, allow_blank=True, max_length=500)
     quiz_title = serializers.CharField(source='quiz.title', read_only=True, default=None)
     topic_label = serializers.SerializerMethodField()
 
     class Meta:
         from .models import Question
         model = Question
-        fields = ('id', 'quiz', 'quiz_title', 'kind', 'text_md', 'explanation_md', 'expected_answer', 'points', 'order', 'topic', 'topic_label', 'in_exam_bank', 'is_published', 'choices')
+        fields = ('id', 'quiz', 'quiz_title', 'kind', 'text_md', 'explanation_md', 'expected_answer', 'points', 'order', 'topic', 'topic_label', 'image_url', 'video_url', 'in_exam_bank', 'is_published', 'choices')
 
     def get_topic_label(self, obj):
         from .models import theme_label

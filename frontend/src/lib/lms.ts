@@ -17,7 +17,7 @@ export interface LessonDetail {
 }
 
 export type QuestionKind = 'SINGLE' | 'MULTI' | 'TRUE_FALSE' | 'SHORT' | 'CODE';
-export interface PublicQuestion { id: number; kind: QuestionKind; text_md: string; points: number; topic: string; choices: { id: number; text: string }[] }
+export interface PublicQuestion { id: number; kind: QuestionKind; text_md: string; points: number; topic: string; image_url?: string; video_url?: string; video_embed?: string; video_is_file?: boolean; choices: { id: number; text: string }[] }
 export type Answer = number[] | string;
 export interface CorrectionItem { id: number; correct: boolean; correct_answer: number[] | string; explanation_md: string; given: Answer | null }
 export interface QuizData { id: number; title: string; pass_score: number; section: number | null; lesson: number | null; course_slug: string; questions: PublicQuestion[]; best_score: number | null; attempts: number }
@@ -37,7 +37,7 @@ export interface StudentLmsReport extends ExamStats { history: ExamAttempt[]; qu
 
 export interface Theme { code: string; title: string; description: string; default_count: number; bank: number; label: string }
 export interface AdminChoice { id?: number; text: string; is_correct: boolean; order?: number }
-export interface AdminQuestion { id: number; quiz: number | null; quiz_title: string | null; kind: QuestionKind; text_md: string; explanation_md: string; expected_answer: string; points: number; order: number; topic: string; topic_label: string; in_exam_bank: boolean; is_published: boolean; choices: AdminChoice[] }
+export interface AdminQuestion { id: number; quiz: number | null; quiz_title: string | null; kind: QuestionKind; text_md: string; explanation_md: string; expected_answer: string; points: number; order: number; topic: string; topic_label: string; image_url: string; video_url: string; in_exam_bank: boolean; is_published: boolean; choices: AdminChoice[] }
 export interface AdminLessonRow { id: number; title: string; slug: string; order: number; is_published: boolean; has_video: boolean; minutes: number; completions: number }
 export interface AdminQuizRow { id: number; title: string; questions: number; is_published: boolean; attempts: number; pass_rate: number | null }
 export interface AdminSection { id: number; course: number; title: string; code: string; code_label: string; order: number; is_free_preview: boolean; unlock_threshold: number; lessons: AdminLessonRow[]; quiz: AdminQuizRow | null }

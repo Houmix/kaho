@@ -105,14 +105,18 @@ class Lesson(models.Model):
     @property
     def embed_url(self):
         """Transforme une URL YouTube/Vimeo « page » en URL d'intégration."""
-        u = self.video_url
-        m = re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{6,})', u)
-        if m:
-            return f"https://www.youtube-nocookie.com/embed/{m.group(1)}?rel=0"
-        m = re.search(r'vimeo\.com/(?:video/)?(\d+)', u)
-        if m:
-            return f"https://player.vimeo.com/video/{m.group(1)}"
-        return u
+        return embed_url_for(self.video_url)
+
+
+def embed_url_for(u):
+    """URL « page » YouTube / Vimeo → URL d'intégration ; sinon inchangée."""
+    m = re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{6,})', u or '')
+    if m:
+        return f"https://www.youtube-nocookie.com/embed/{m.group(1)}?rel=0"
+    m = re.search(r'vimeo\.com/(?:video/)?(\d+)', u or '')
+    if m:
+        return f"https://player.vimeo.com/video/{m.group(1)}"
+    return u or ''
 
 
 def lesson_asset_upload(instance, filename):
@@ -172,6 +176,8 @@ class Question(models.Model):
     points = models.PositiveSmallIntegerField(default=1)
     order = models.PositiveIntegerField(default=0)
     topic = models.CharField("Thème (banque d'examen)", max_length=60, blank=True, db_index=True)
+    image_url = models.URLField("Illustration (URL de l'image)", max_length=500, blank=True)
+    video_url = models.URLField("Vidéo explicative (YouTube, Vimeo, .mp4 / .webm)", max_length=500, blank=True)
     in_exam_bank = models.BooleanField("Dans la banque d'examens blancs", default=False)
     is_published = models.BooleanField(default=True)
 
@@ -198,9 +204,18 @@ class Question(models.Model):
         accepted = [self._norm(a) for a in self.expected_answer.split('|') if a.strip()]
         return self._norm(answer if isinstance(answer, str) else '') in accepted, self.expected_answer.split('|')[0]
 
+    @property
+    def video_embed(self):
+        return embed_url_for(self.video_url)
+
+    @property
+    def video_is_file(self):
+        return self.video_url.lower().split('?')[0].endswith(('.mp4', '.webm', '.m4v'))
+
     def public(self):
         return {
             'id': self.id, 'kind': self.kind, 'text_md': self.text_md, 'points': self.points, 'topic': self.topic,
+            'image_url': self.image_url, 'video_url': self.video_url, 'video_embed': self.video_embed, 'video_is_file': self.video_is_file,
             'choices': [{'id': c.id, 'text': c.text} for c in self.choices.all()],
         }
 

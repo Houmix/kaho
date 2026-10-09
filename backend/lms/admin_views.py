@@ -178,6 +178,27 @@ class AdminExamViewSet(_Logged, viewsets.ModelViewSet):
     label = 'Examen blanc'
 
 
+class MediaUploadView(APIView):
+    """Téléversement d'un média (image / vidéo courte) pour une question ou une leçon : renvoie l'URL à enregistrer."""
+    permission_classes = [IsSupervisorOrAdmin]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+    ALLOWED = ('png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm')
+    MAX_BYTES = 25 * 1024 * 1024
+
+    def post(self, request):
+        f = request.FILES.get('file')
+        if not f:
+            return Response({'detail': 'Fichier requis.'}, status=400)
+        ext = (f.name.rsplit('.', 1)[-1] if '.' in f.name else '').lower()
+        if ext not in self.ALLOWED:
+            return Response({'detail': f"Format non accepté ({ext or 'inconnu'}). Images : png, jpg, webp, gif — vidéos : mp4, webm."}, status=400)
+        if f.size > self.MAX_BYTES:
+            return Response({'detail': 'Fichier trop lourd (25 Mo maximum). Pour une longue vidéo, utilisez un lien YouTube / Vimeo.'}, status=400)
+        a = LessonAsset.objects.create(title=request.data.get('title', '') or f.name, file=f)
+        url = request.build_absolute_uri(a.file.url)
+        return Response({'id': a.id, 'url': url, 'kind': 'video' if ext in ('mp4', 'webm') else 'image', 'markdown': f"![{a.title}]({url})"}, status=201)
+
+
 class ThemesView(APIView):
     """Les 10 thèmes officiels + nombre de questions en banque pour chacun."""
     permission_classes = [IsSupervisorOrAdmin]

@@ -62,7 +62,10 @@ export default function AdminQuizEditor() {
       </div>
       {editing === 'new' ? <QuestionEditor quizId={quiz.id} themes={themes} onSaved={() => { setEditing(null); load(); setMsg({ ok: true, text: 'Question ajoutée.' }); }} onCancel={() => setEditing(null)} />
         : <button onClick={() => setEditing('new')} className="btn-primary">+ Ajouter une question</button>}
-      <p className="text-xs text-brown-800/50 mt-6"><button onClick={() => confirm('Supprimer ce quiz et ses questions ?') && api.delete(`/lms/admin/quizzes/${id}/`).then(() => router.push('/admin/lms'))} className="text-red-700 hover:underline">Supprimer le quiz</button></p>
+      <div className="flex items-center justify-between mt-8 border-t border-cream-200 pt-4 text-sm">
+        <Link href="/admin/lms" className="text-brown-700 hover:underline">← Retour aux contenus LMS</Link>
+        <button onClick={() => confirm('Supprimer ce quiz et ses questions ?') && api.delete(`/lms/admin/quizzes/${id}/`).then(() => router.push('/admin/lms'))} className="text-red-700 hover:underline text-xs">Supprimer le quiz</button>
+      </div>
     </AdminShell>
   );
 }

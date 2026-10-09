@@ -351,8 +351,10 @@ class Offer(models.Model):
     CATEGORY_CHOICES = [
         ('PERMIS_B', 'Permis B'),
         ('CODE', 'Code seul'),
+        ('EXAMS', 'Examens blancs'),
         ('PERFECTIONNEMENT', 'Perfectionnement / remise en selle'),
         ('RECHARGE', "Recharge d'heures"),
+        ('OPTION', 'Option (à ajouter à une formule)'),
     ]
     BILLING_CHOICES = [
         ('ONE_TIME', 'Paiement unique'),
@@ -370,8 +372,13 @@ class Offer(models.Model):
     hours = models.FloatField("Heures de conduite incluses", validators=[MinValueValidator(0)], default=0)
     price = models.DecimalField("Prix TTC (€)", max_digits=8, decimal_places=2, validators=[MinValueValidator(0)])
     billing_type = models.CharField("Type de facturation", max_length=20, choices=BILLING_CHOICES, default='ONE_TIME')
-    includes_lms = models.BooleanField("Accès cours de code / quiz / examens blancs", default=False)
+    includes_lms = models.BooleanField("Accès cours de code / quiz (LMS)", default=False)
+    includes_exams = models.BooleanField("Accès aux examens blancs", default=False)
     validity_months = models.PositiveSmallIntegerField("Validité (mois, vide = illimité)", null=True, blank=True)
+    billing_interval_months = models.PositiveSmallIntegerField("Abonnement : prélèvement tous les N mois", default=1)
+    is_addon = models.BooleanField("Option ajoutable à une formule (configurateur élève)", default=False)
+    skills = models.ManyToManyField('Competency', blank=True, related_name='offers', verbose_name="Compétences ciblées (perfectionnement)")
+    lets_student_pick_skills = models.BooleanField("L'élève choisit les compétences à travailler", default=False)
     for_code_status = models.CharField("Cible : statut du code", max_length=10, choices=CODE_STATUS_CHOICES, default='ANY')
     for_level = models.CharField("Cible : niveau", max_length=10, choices=LEVEL_CHOICES, default='ANY')
     gearbox = models.CharField("Boîte", max_length=10, choices=GEARBOX_CHOICES, default='ANY')
@@ -391,6 +398,14 @@ class Offer(models.Model):
     @property
     def price_per_hour(self):
         return round(float(self.price) / self.hours, 2) if self.hours else None
+
+    @property
+    def installments(self):
+        return {'INSTALLMENTS_3': 3, 'INSTALLMENTS_4': 4}.get(self.billing_type, 1)
+
+    @property
+    def is_recurring(self):
+        return self.billing_type == 'MONTHLY'
 
 
 class Package(models.Model):
@@ -413,6 +428,10 @@ class Package(models.Model):
     stripe_payment_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
     stripe_session_id = models.CharField(max_length=120, blank=True, default='')
     stripe_checkout_url = models.URLField("Lien de paiement", max_length=500, blank=True, default='')
+    stripe_subscription_id = models.CharField(max_length=120, blank=True, default='', db_index=True)
+    installments_paid = models.PositiveSmallIntegerField("Échéances réglées", default=0)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='addons', verbose_name="Formule de base (si option)")
+    requested_skills = models.JSONField("Compétences choisies par l'élève (codes REMC)", default=list, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     paid_at = models.DateTimeField("Payé le", null=True, blank=True)
     expires_at = models.DateField("Fin de validité", null=True, blank=True)
@@ -450,6 +469,24 @@ class Package(models.Model):
     def display_label(self):
         return self.offer.name if self.offer else (self.label or (f"Heures de conduite ({self.hours_purchased:g} h)" if self.hours_purchased else 'Règlement'))
 
+    @property
+    def bundle(self):
+        """Formule de base + options achetées ensemble."""
+        base = self.parent or self
+        return [base] + list(base.addons.all())
+
+    def extend_period(self, months):
+        """Abonnement : chaque prélèvement prolonge la validité et l'accès code de N mois."""
+        today = timezone.localdate()
+        base = self.expires_at if (self.expires_at and self.expires_at > today) else today
+        self.expires_at = add_months(base, months)
+        self.save(update_fields=['expires_at', 'updated_at'])
+        if self.offer and self.offer.includes_lms:
+            st = self.student
+            base = st.lms_access_until if (st.lms_access_until and st.lms_access_until > today) else today
+            st.lms_access, st.lms_access_until = True, add_months(base, months)
+            st.save(update_fields=['lms_access', 'lms_access_until'])
+
     def _grant(self):
         today = timezone.localdate()
         self.paid_at = timezone.now()
@@ -457,7 +494,7 @@ class Package(models.Model):
         st.purchased_hours += self.hours_purchased
         update = ['purchased_hours']
         if self.offer:
-            months = self.offer.validity_months
+            months = self.offer.billing_interval_months if self.offer.is_recurring else self.offer.validity_months
             self.expires_at = add_months(today, months) if months else None
             if self.offer.includes_lms:
                 st.lms_access = True
@@ -555,13 +592,14 @@ class Document(models.Model):
         ('PHOTO', 'Photo-signature numérique (ePhoto)'),
         ('PROOF_ADDRESS', 'Justificatif de domicile'),
         ('JDC', 'Attestation JDC / recensement'),
+        ('ASSR2', 'ASSR 2 (ou ASR)'),
         ('NEPH_CERTIFICATE', 'Attestation NEPH'),
         ('CONTRACT', 'Contrat de formation signé'),
     ]
 
     STATUS_CHOICES = [('PENDING', 'À vérifier'), ('VERIFIED', 'Validé'), ('REJECTED', 'Refusé')]
     REQUIRED_TYPES = ('IDENTITY', 'PHOTO', 'PROOF_ADDRESS', 'NEPH_CERTIFICATE', 'CONTRACT')
-    OPTIONAL_TYPES = ('JDC',)
+    OPTIONAL_TYPES = ('JDC', 'ASSR2')
 
     student = models.ForeignKey(StudentProfile, on_delete=models.CASCADE, related_name='documents')
     document_type = models.CharField(max_length=50, choices=TYPE_CHOICES)
