@@ -39,7 +39,7 @@ function BookForStudent({ studentId, onDone }: { studentId: number; onDone: (tex
     if (!sel) return;
     setBusy(true);
     try {
-      await api.post(`/admin/students/${studentId}/book/`, { instructor: sel.instructor_id, meeting_point: point, date: sel.date, start_time: sel.start_time, end_time: sel.end_time, force });
+      await api.post(`/admin/students/${studentId}/book/`, { instructor: sel.instructor_id, meeting_point: point || null, date: sel.date, start_time: sel.start_time, end_time: sel.end_time, force });
       onDone(`Leçon réservée le ${frDate(sel.date, { day: 'numeric', month: 'short' })} à ${sel.start_time} avec ${sel.instructor_name} (élève prévenu par email).`);
       setSel(null); setDate('');
     } catch (err) { onDone(apiError(err, 'Réservation impossible.'), false); }
@@ -58,9 +58,9 @@ function BookForStudent({ studentId, onDone }: { studentId: number; onDone: (tex
       ))}
       {sel && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <select value={point} onChange={(e) => setPoint(e.target.value)} className="input-field !py-2 w-48">{points.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+          <select value={point} onChange={(e) => setPoint(e.target.value)} className="input-field !py-2 w-48">{points.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}<option value="">Lieu à convenir</option></select>
           <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} className="accent-brown-700" /> forcer même sans crédit</label>
-          <button onClick={book} disabled={busy || !point} className="btn-primary !py-2 text-sm">Réserver {sel.start_time}–{sel.end_time}</button>
+          <button onClick={book} disabled={busy} className="btn-primary !py-2 text-sm">Réserver {sel.start_time}–{sel.end_time}</button>
         </div>
       )}
     </div>

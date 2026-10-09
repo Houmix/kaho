@@ -49,11 +49,11 @@ export default function Reservation() {
   }, [ready, date]);
 
   const book = async () => {
-    if (!selected || !pointId) return;
+    if (!selected) return;
     setBusy(true); setMessage(null);
     try {
       await api.post('/slots/book/', {
-        instructor: selected.instructor_id, meeting_point: pointId,
+        instructor: selected.instructor_id, meeting_point: pointId || null,
         date: selected.date, start_time: selected.start_time, end_time: selected.end_time,
       });
       setMessage({ kind: 'ok', text: `Leçon réservée le ${frDate(selected.date)} à ${selected.start_time} avec ${selected.instructor_name}. Un email de confirmation vous a été envoyé.` });
@@ -136,13 +136,14 @@ export default function Reservation() {
       <section className="card mb-10">
         <h2 className="text-xl mb-3">3. Point de rendez-vous</h2>
         {points.length === 0 ? (
-          <p className="text-brown-800/60">Aucun point de rendez-vous configuré.</p>
+          <p className="text-brown-800/60">Lieu à convenir avec votre moniteur : il vous contactera pour fixer le point de rendez-vous.</p>
         ) : (
-          <select value={pointId ?? ''} onChange={(e) => setPointId(Number(e.target.value))} className="input-field sm:w-96">
+          <select value={pointId ?? ''} onChange={(e) => setPointId(e.target.value ? Number(e.target.value) : null)} className="input-field sm:w-96">
             {points.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.address}</option>)}
+            <option value="">Lieu à convenir avec le moniteur</option>
           </select>
         )}
-        <button onClick={book} disabled={!selected || !pointId || busy} className="btn-primary mt-4 w-full sm:w-auto disabled:opacity-50">
+        <button onClick={book} disabled={!selected || busy} className="btn-primary mt-4 w-full sm:w-auto disabled:opacity-50">
           {busy ? 'Réservation…' : selected ? `Réserver ${selected.start_time} avec ${selected.instructor_name}` : 'Sélectionnez un créneau'}
         </button>
       </section>

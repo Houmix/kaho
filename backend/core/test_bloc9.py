@@ -165,3 +165,31 @@ class LoginAndAdminInstructorTests(APITestCase):
         pub = self.client.get('/api/instructors/').data
         self.assertIn(self.owner.id, [i['id'] for i in (pub['results'] if isinstance(pub, dict) else pub)])
         self.assertEqual(self.client.get('/api/admin/sales/').status_code, 200)  # droits gérant conservés
+
+
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, BOOKING_MIN_NOTICE_HOURS=0)
+class BookingWithoutMeetingPointTests(APITestCase):
+    def test_student_books_without_meeting_point_and_instructor_manages_points(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from .models import Availability, MeetingPoint
+        ins = User.objects.create_user(username='m@kaho.app', email='m@kaho.app', password='pass12345', first_name='Kawtar', last_name='K', role='INSTRUCTOR')
+        for wd in range(7):
+            Availability.objects.create(instructor=ins, weekday=wd, start_time='08:00', end_time='20:00')
+        su = User.objects.create_user(username='e@test.fr', email='e@test.fr', password='pass12345', first_name='Jean', last_name='D', role='STUDENT')
+        su.student_profile.purchased_hours = 4.5
+        su.student_profile.save()
+        self.assertEqual(MeetingPoint.objects.count(), 0)
+        r = self.client.post('/api/auth/token/', {'username': 'e@test.fr', 'password': 'pass12345'})
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {r.data['access']}")
+        day = (timezone.localdate() + timedelta(days=2)).isoformat()
+        r = self.client.post('/api/slots/book/', {'instructor': ins.id, 'date': day, 'start_time': '09:00', 'end_time': '10:00'}, format='json')
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertIsNone(r.data['meeting_point'])
+        self.assertEqual(r.data['meeting_point_name'], 'Lieu à convenir avec le moniteur')
+        # le moniteur crée un point de rendez-vous depuis son espace
+        r = self.client.post('/api/auth/token/', {'username': 'm@kaho.app', 'password': 'pass12345'})
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {r.data['access']}")
+        r = self.client.post('/api/meeting-points/', {'name': 'Gare', 'address': 'Place de la gare'})
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(len(self.client.get('/api/meeting-points/').data), 1)

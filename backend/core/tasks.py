@@ -141,7 +141,7 @@ def send_booking_confirmation(slot_id):
           <li><strong>Date :</strong> {_fr_date(slot.date)}</li>
           <li><strong>Heure :</strong> {slot.start_time:%H:%M} – {slot.end_time:%H:%M}</li>
           <li><strong>Moniteur :</strong> {slot.instructor.get_full_name()}</li>
-          <li><strong>Lieu :</strong> {slot.meeting_point.name} — {slot.meeting_point.address}</li>
+          <li><strong>Lieu :</strong> {slot.place_full}</li>
         </ul>
         <p>Annulation gratuite jusqu'à {settings.BOOKING_CANCEL_DEADLINE_HOURS} h avant, depuis votre espace.</p>"""),
     )
@@ -187,7 +187,7 @@ def send_booking_changed(slot_id, old_label):
           <li><strong>Nouvelle date :</strong> {_fr_date(slot.date)}</li>
           <li><strong>Heure :</strong> {slot.start_time:%H:%M} – {slot.end_time:%H:%M}</li>
           <li><strong>Moniteur :</strong> {slot.instructor.get_full_name()}</li>
-          <li><strong>Lieu :</strong> {slot.meeting_point.name} — {slot.meeting_point.address}</li>
+          <li><strong>Lieu :</strong> {slot.place_full}</li>
         </ul>
         <p>En cas d'empêchement, annulez depuis votre espace ou contactez-nous.</p>"""),
     )
@@ -214,11 +214,11 @@ def send_lesson_reminders():
               <li><strong>Date :</strong> {_fr_date(slot.date)}</li>
               <li><strong>Heure :</strong> {slot.start_time:%H:%M} – {slot.end_time:%H:%M}</li>
               <li><strong>Moniteur :</strong> {slot.instructor.get_full_name()}</li>
-              <li><strong>Lieu :</strong> {slot.meeting_point.name} — {slot.meeting_point.address}</li>
+              <li><strong>Lieu :</strong> {slot.place_full}</li>
             </ul>
             <p>Merci d'arriver 5 minutes avant l'heure.</p>"""),
         )
-        _send_sms(slot.student.phone, f"Kaho : rappel de votre leçon demain à {slot.start_time:%H:%M} avec {slot.instructor.first_name}, RDV {slot.meeting_point.name}.")
+        _send_sms(slot.student.phone, f"Kaho : rappel de votre leçon demain à {slot.start_time:%H:%M} avec {slot.instructor.first_name}, RDV {slot.place_label}.")
     log_activity('REMINDERS', f"Rappels envoyés pour le {tomorrow:%d/%m/%Y} : {sent} leçon(s)")
     return sent
 

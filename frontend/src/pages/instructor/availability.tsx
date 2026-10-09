@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
+import MeetingPointsManager from '@/components/MeetingPointsManager';
 import { Availability, Unavailability, WEEKDAYS, apiError, hm } from '@/lib/types';
 
 export default function AvailabilityPage() {
@@ -99,6 +100,12 @@ export default function AvailabilityPage() {
           )}
         </section>
       </div>
+
+      <section className="card mt-6">
+        <h2 className="text-xl mb-1">Points de rendez-vous</h2>
+        <p className="text-xs text-brown-800/60 mb-3">Lieux proposés aux élèves quand ils réservent une leçon.</p>
+        {ready && <MeetingPointsManager />}
+      </section>
     </AppShell>
   );
 }

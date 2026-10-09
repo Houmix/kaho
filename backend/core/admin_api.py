@@ -442,7 +442,7 @@ class AdminStudentViewSet(viewsets.ReadOnlyModelViewSet):
                 return Response({'detail': f"Crédit insuffisant : {st.bookable_hours:.1f} h réservables (cochez « forcer » pour réserver quand même)."}, status=400)
             if not is_window_free(d['instructor'], d['date'], d['start_time'], d['end_time']):
                 return Response({'detail': "Le moniteur n'est pas disponible sur ce créneau (hors disponibilités, déjà pris ou préavis trop court)."}, status=409)
-            slot = Slot.objects.create(instructor=d['instructor'], student=st, meeting_point=d['meeting_point'], date=d['date'], start_time=d['start_time'], end_time=d['end_time'], status='BOOKED')
+            slot = Slot.objects.create(instructor=d['instructor'], student=st, meeting_point=d.get('meeting_point'), date=d['date'], start_time=d['start_time'], end_time=d['end_time'], status='BOOKED')
         if str(request.data.get('notify', 'true')).lower() not in ('false', '0'):
             send_booking_confirmation.delay(slot.id)
         log_activity('BOOKING', f"{st.user.get_full_name()} — leçon du {slot.date:%d/%m} {slot.start_time:%H:%M} avec {slot.instructor.get_full_name()} réservée par {request.user.get_full_name()}",
@@ -957,7 +957,7 @@ class AdminPayrollView(APIView):
                 'id': ins.id, 'name': ins.get_full_name(), 'email': ins.email, 'hourly_rate': rate, 'hours': hours,
                 'lessons': lessons.count(), 'no_shows': no_shows, 'amount': amount,
                 'details': [{'date': l.slot.date, 'start_time': l.slot.start_time, 'hours': l.slot.duration_hours,
-                             'student': l.slot.student.user.get_full_name() if l.slot.student else '', 'place': l.slot.meeting_point.name} for l in lessons],
+                             'student': l.slot.student.user.get_full_name() if l.slot.student else '', 'place': l.slot.place_label} for l in lessons],
             })
         return Response({'month': f"{y:04d}-{m:02d}", 'rows': rows, 'total': round(total, 2), 'total_hours': round(sum(r['hours'] for r in rows), 2)})
 

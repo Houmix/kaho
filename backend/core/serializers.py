@@ -315,7 +315,7 @@ class BookingSerializer(serializers.Serializer):
     instructor = serializers.PrimaryKeyRelatedField(
         queryset=User.instructors().filter(instructor_profile__is_bookable=True)
     )
-    meeting_point = serializers.PrimaryKeyRelatedField(queryset=MeetingPoint.objects.all())
+    meeting_point = serializers.PrimaryKeyRelatedField(queryset=MeetingPoint.objects.all(), required=False, allow_null=True)
     date = serializers.DateField()
     start_time = serializers.TimeField()
     end_time = serializers.TimeField()
@@ -334,7 +334,7 @@ class MeetingPointSerializer(serializers.ModelSerializer):
 
 
 class SlotSerializer(serializers.ModelSerializer):
-    meeting_point_name = serializers.CharField(source='meeting_point.name', read_only=True)
+    meeting_point_name = serializers.CharField(source='place_label', read_only=True)
     student_name = serializers.CharField(source='student.user.get_full_name', read_only=True, allow_null=True)
     instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
     duration_hours = serializers.FloatField(read_only=True)

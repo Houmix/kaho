@@ -225,7 +225,7 @@ class Slot(models.Model):
     start_time = models.TimeField()
     end_time = models.TimeField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='AVAILABLE')
-    meeting_point = models.ForeignKey(MeetingPoint, on_delete=models.PROTECT, related_name='slots')
+    meeting_point = models.ForeignKey(MeetingPoint, on_delete=models.SET_NULL, null=True, blank=True, related_name='slots', verbose_name='Point de rendez-vous (vide = à convenir)')
     student = models.ForeignKey(StudentProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='booked_slots')
     instructor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='slots', limit_choices_to={'role': 'INSTRUCTOR'})
     cancelled_at = models.DateTimeField(null=True, blank=True)
@@ -239,7 +239,15 @@ class Slot(models.Model):
         ordering = ['date', 'start_time']
 
     def __str__(self):
-        return f"{self.date} {self.start_time} - {self.meeting_point.name} ({self.get_status_display()})"
+        return f"{self.date} {self.start_time} - {self.place_label} ({self.get_status_display()})"
+
+    @property
+    def place_label(self):
+        return self.meeting_point.name if self.meeting_point else "Lieu à convenir avec le moniteur"
+
+    @property
+    def place_full(self):
+        return f"{self.meeting_point.name} — {self.meeting_point.address}" if self.meeting_point else "Lieu à convenir avec votre moniteur"
 
     @property
     def duration_hours(self):

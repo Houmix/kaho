@@ -259,7 +259,7 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
             if not is_window_free(d['instructor'], d['date'], d['start_time'], d['end_time']):
                 return Response({'detail': "Ce créneau n'est plus disponible."}, status=status.HTTP_409_CONFLICT)
             slot = Slot.objects.create(
-                instructor=d['instructor'], student=profile, meeting_point=d['meeting_point'],
+                instructor=d['instructor'], student=profile, meeting_point=d.get('meeting_point'),
                 date=d['date'], start_time=d['start_time'], end_time=d['end_time'], status='BOOKED',
             )
         send_booking_confirmation.delay(slot.id)
