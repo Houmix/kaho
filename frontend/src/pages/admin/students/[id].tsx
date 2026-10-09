@@ -11,6 +11,8 @@ import { ActivityEntry, InstructorAdmin, StudentOverview, downloadFile } from '@
 import { formatPrice } from '@/lib/offers';
 import { FreeWindow, MeetingPoint, STUDENT_STATUSES, apiError, frDate, hm, statusOf } from '@/lib/types';
 import { ActivityList } from '../activity';
+import { ReadinessGauge, ScoreChart, StatTiles, TopicBars } from '@/components/LmsAnalytics';
+import { StudentLmsReport } from '@/lib/lms';
 
 const DOC_TYPES = [['IDENTITY', 'Pièce d’identité'], ['PHOTO', 'ePhoto'], ['PROOF_ADDRESS', 'Justificatif de domicile'], ['JDC', 'Attestation JDC'], ['NEPH_CERTIFICATE', 'Attestation NEPH'], ['CONTRACT', 'Contrat signé']];
 
@@ -72,7 +74,8 @@ export default function AdminStudentDetail() {
   const [d, setD] = useState<StudentOverview | null>(null);
   const [history, setHistory] = useState<ActivityEntry[]>([]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [tab, setTab] = useState<'overview' | 'lessons' | 'slots' | 'history'>('overview');
+  const [tab, setTab] = useState<'overview' | 'lessons' | 'slots' | 'history' | 'code'>('overview');
+  const [lms, setLms] = useState<StudentLmsReport | null>(null);
   const [action, setAction] = useState<ActionKey | undefined>(undefined);
   const [uploadType, setUploadType] = useState('IDENTITY');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -80,6 +83,7 @@ export default function AdminStudentDetail() {
   const load = useCallback(() => id && Promise.all([
     api.get(`/admin/students/${id}/overview/`).then((r) => setD(r.data)),
     api.get('/admin/activity/', { params: { student: id, page_size: 50 } }).then((r) => setHistory(r.data.results)),
+    api.get(`/lms/admin/students/${id}/`).then((r) => setLms(r.data)).catch(() => {}),
   ]), [id]);
   useEffect(() => { if (ready && id) load(); }, [ready, id, load]);
 
@@ -127,7 +131,7 @@ export default function AdminStudentDetail() {
       {msg && <div className={`rounded-xl px-4 py-3 mb-6 text-sm ${msg.ok ? 'border border-brown-300 bg-brown-50' : 'border border-red-200 bg-red-50 text-red-700'}`}>{msg.text}</div>}
 
       <div className="flex gap-1 mb-6 flex-wrap">
-        {([['overview', 'Vue d’ensemble'], ['lessons', `Bilans (${d.lessons.length})`], ['slots', `Créneaux (${d.upcoming_slots.length + d.past_slots.length})`], ['history', `Historique (${history.length})`]] as const).map(([k, l]) => (
+        {([['overview', 'Vue d’ensemble'], ['code', `Code en ligne${lms ? ` (${lms.readiness ?? '—'} %)` : ''}`], ['lessons', `Bilans (${d.lessons.length})`], ['slots', `Créneaux (${d.upcoming_slots.length + d.past_slots.length})`], ['history', `Historique (${history.length})`]] as const).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className={`badge !px-4 !py-2 ${tab === k ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>{l}</button>
         ))}
       </div>
@@ -270,6 +274,32 @@ export default function AdminStudentDetail() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {tab === 'code' && (
+        !lms ? <p className="text-brown-500">Chargement…</p> : (
+          <div className="grid lg:grid-cols-3 gap-6">
+            <section className="card lg:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4"><h2 className="text-xl">Préparation à l'examen du code</h2>{!lms.has_lms_access && <span className="badge bg-cream-200 text-brown-800">pas d'accès actif</span>}</div>
+              <div className="grid md:grid-cols-[220px_1fr] gap-6 items-start"><ReadinessGauge value={lms.readiness} count={lms.readiness_count} /><StatTiles s={lms} /></div>
+              <div className="grid md:grid-cols-2 gap-6 mt-6"><div><p className="text-sm font-medium mb-2">Évolution des scores</p><ScoreChart points={lms.evolution} /></div><div><p className="text-sm font-medium mb-2">Thème par thème</p><TopicBars topics={lms.by_topic} /></div></div>
+            </section>
+            <section className="card">
+              <h2 className="text-xl mb-2">Inscription à l'examen officiel (ETG)</h2>
+              {lms.etg_validated_at ? (
+                <><p className="text-sm"><span className="badge bg-brown-700 text-cream-50">Validée</span> le {frDate(lms.etg_validated_at, { day: 'numeric', month: 'short', year: 'numeric' })}{lms.etg_validated_by && ` par ${lms.etg_validated_by}`}</p>
+                  <button onClick={() => confirm('Annuler la validation ?') && act(() => api.post(`/lms/admin/students/${id}/`, { cancel: true }), 'Validation annulée.')} className="text-xs text-red-700 hover:underline mt-3">Annuler la validation</button></>
+              ) : (
+                <><p className="text-sm text-brown-800/70 mb-3">{lms.readiness !== null && lms.readiness >= 88 ? 'Le niveau est atteint (≥ 88 % sur les derniers examens blancs).' : 'Recommandé lorsque la jauge dépasse 88 % sur les 5 derniers examens blancs.'}</p>
+                  <button onClick={() => confirm(`Valider l'inscription de ${s.user.first_name} à l'examen du code ?`) && act(() => api.post(`/lms/admin/students/${id}/`), 'Inscription à l’ETG validée (tracée dans l’historique).')} className="btn-primary !py-2 text-sm">Valider l'inscription à l'ETG</button></>
+              )}
+              <h3 className="font-semibold text-sm mt-6 mb-2">Derniers examens blancs</h3>
+              {lms.history.length === 0 ? <p className="text-sm text-brown-800/60">Aucun.</p> : <ul className="text-sm divide-y divide-cream-200">{lms.history.slice(0, 8).map((a) => <li key={a.id} className="py-1.5 flex justify-between"><span>{a.submitted_at ? frDate(a.submitted_at, { day: 'numeric', month: 'short' }) : ''} · {a.exam_title}</span><span className={a.passed ? 'text-brown-700 font-medium' : 'text-red-700'}>{a.score} %</span></li>)}</ul>}
+              <h3 className="font-semibold text-sm mt-4 mb-2">Dernières séries de quiz</h3>
+              {lms.quizzes.length === 0 ? <p className="text-sm text-brown-800/60">Aucune.</p> : <ul className="text-sm divide-y divide-cream-200">{lms.quizzes.slice(0, 8).map((qa) => <li key={qa.id} className="py-1.5 flex justify-between"><span>{frDate(qa.created_at, { day: 'numeric', month: 'short' })} · {qa.quiz_title}</span><span className={qa.passed ? 'text-brown-700 font-medium' : 'text-red-700'}>{qa.score} %</span></li>)}</ul>}
+            </section>
+          </div>
+        )
       )}
 
       {tab === 'history' && (

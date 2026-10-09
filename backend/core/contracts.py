@@ -9,7 +9,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from .invoices import BROWN, CREAM, INK, MUTED, _eur, _fr
+from .invoices import BROWN, CREAM, INK, MUTED, _eur, _fr, logo_cell
 
 
 def _company_block():
@@ -38,7 +38,7 @@ def build_contract_pdf(student, package=None) -> bytes:
     h1 = ParagraphStyle('h1', parent=base, fontName='Helvetica-Bold', fontSize=16, leading=20, textColor=BROWN)
     h2 = ParagraphStyle('h2', parent=base, fontName='Helvetica-Bold', fontSize=11, leading=15, textColor=BROWN, spaceBefore=6)
 
-    header = Table([[Paragraph(_company_block(), base), Paragraph(f"<b>Contrat de formation</b><br/>Réf. KAHO-CTR-{student.id:05d}<br/>Édité le {_fr(today)}", base)]], colWidths=[104 * mm, 70 * mm])
+    header = Table([[Table([[logo_cell(), Paragraph(_company_block(), base)]], colWidths=[22 * mm, 82 * mm], style=TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LEFTPADDING', (0, 0), (-1, -1), 0)])), Paragraph(f"<b>Contrat de formation</b><br/>Réf. KAHO-CTR-{student.id:05d}<br/>Édité le {_fr(today)}", base)]], colWidths=[104 * mm, 70 * mm])
     header.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('ALIGN', (1, 0), (1, 0), 'RIGHT')]))
 
     license_label = 'B — boîte automatique (BEA)' if student.license_type == 'AUTO' else 'B — boîte manuelle'

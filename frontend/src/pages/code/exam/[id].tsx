@@ -21,7 +21,9 @@ export default function ExamPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [current, setCurrent] = useState(0);
+  const [qLeft, setQLeft] = useState(0);
   const dirty = useRef<Record<string, Answer>>({});
+  const perQuestion = payload?.attempt.seconds_per_question ?? 0;
 
   useEffect(() => {
     if (!ready || !examId) return;
@@ -62,6 +64,21 @@ export default function ExamPage() {
     const t = setInterval(() => setLeft((s) => { if (s <= 1) { clearInterval(t); submit(true); return 0; } return s - 1; }), 1000);
     return () => clearInterval(t);
   }, [payload, submit]);
+
+  // Mode officiel : chrono strict par question, passage automatique à la suivante, remise à la fin
+  useEffect(() => {
+    if (!payload || !perQuestion) return;
+    setQLeft(perQuestion);
+    const t = setInterval(() => setQLeft((s) => {
+      if (s <= 1) {
+        clearInterval(t);
+        if (current < payload.questions.length - 1) setCurrent((c) => c + 1); else submit(true);
+        return 0;
+      }
+      return s - 1;
+    }), 1000);
+    return () => clearInterval(t);
+  }, [payload, perQuestion, current, submit]);
 
   // Sauvegarde progressive toutes les 5 s
   useEffect(() => {
@@ -113,7 +130,7 @@ export default function ExamPage() {
               <p className="text-brown-800/70 mt-2">{exam.description}</p>
               <ul className="mt-4 text-sm space-y-1 text-brown-800/80">
                 <li>• {Math.min(exam.question_count, exam.available_questions)} questions tirées au hasard dans la banque</li>
-                <li>• {exam.duration_minutes} minutes — remise automatique à la fin du temps</li>
+                {exam.seconds_per_question ? <li>• <strong>{exam.seconds_per_question} secondes</strong> par question, sans retour en arrière — comme à l'examen officiel</li> : <li>• {exam.duration_minutes} minutes — remise automatique à la fin du temps</li>}
                 <li>• Correction et explications <strong>après</strong> la remise, comme à l'examen</li>
                 <li>• Réussite à partir de {exam.pass_score} %</li>
                 {exam.attempts > 0 && <li>• {exam.attempts} tentative(s), meilleur score {exam.best_score} %</li>}
@@ -134,19 +151,28 @@ export default function ExamPage() {
       <div className="max-w-3xl mx-auto">
         <div className={`sticky top-0 z-10 -mx-4 px-4 py-2 mb-4 flex items-center justify-between gap-3 border-b ${urgent ? 'bg-red-50 border-red-200' : 'bg-cream-50/95 backdrop-blur border-cream-200'}`}>
           <span className="text-sm text-brown-800/70">{payload.attempt.exam_title} · {answeredCount}/{payload.questions.length} répondues</span>
-          <span className={`font-mono text-lg font-semibold ${urgent ? 'text-red-700' : ''}`} aria-live="polite">⏱ {fmtSeconds(left)}</span>
+          {perQuestion
+            ? <span className={`font-mono text-2xl font-semibold ${qLeft <= 5 ? 'text-red-700' : ''}`} aria-live="polite">⏱ {qLeft} s</span>
+            : <span className={`font-mono text-lg font-semibold ${urgent ? 'text-red-700' : ''}`} aria-live="polite">⏱ {fmtSeconds(left)}</span>}
         </div>
-        <div className="flex flex-wrap gap-1 mb-4">
-          {payload.questions.map((qq, i) => { const a = answers[qq.id]; const done = Array.isArray(a) ? a.length > 0 : !!a; return <button key={qq.id} onClick={() => setCurrent(i)} className={`w-8 h-8 rounded-lg text-xs font-medium border ${i === current ? 'bg-brown-700 text-cream-50 border-brown-700' : done ? 'bg-brown-100 border-brown-300' : 'bg-white border-cream-300'}`}>{i + 1}</button>; })}
-        </div>
+        {perQuestion ? (
+          <div className="mb-4">
+            <div className="h-1.5 bg-cream-200 rounded-full overflow-hidden"><div className={`h-full transition-all ${qLeft <= 5 ? 'bg-red-500' : 'bg-brown-700'}`} style={{ width: `${(qLeft / perQuestion) * 100}%` }} /></div>
+            <p className="text-xs text-brown-800/60 mt-1">Question {current + 1} / {payload.questions.length}</p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1 mb-4">
+            {payload.questions.map((qq, i) => { const a = answers[qq.id]; const done = Array.isArray(a) ? a.length > 0 : !!a; return <button key={qq.id} onClick={() => setCurrent(i)} className={`w-8 h-8 rounded-lg text-xs font-medium border ${i === current ? 'bg-brown-700 text-cream-50 border-brown-700' : done ? 'bg-brown-100 border-brown-300' : 'bg-white border-cream-300'}`}>{i + 1}</button>; })}
+          </div>
+        )}
         <QuestionCard index={current} q={q} value={answers[q.id]} onChange={(a) => setAnswer(q.id, a)} />
         <div className="mt-4 flex items-center justify-between gap-3">
-          <button onClick={() => setCurrent((c) => Math.max(0, c - 1))} disabled={current === 0} className="btn-secondary disabled:opacity-40">← Précédente</button>
+          {perQuestion ? <span /> : <button onClick={() => setCurrent((c) => Math.max(0, c - 1))} disabled={current === 0} className="btn-secondary disabled:opacity-40">← Précédente</button>}
           {current < payload.questions.length - 1
-            ? <button onClick={() => setCurrent((c) => c + 1)} className="btn-primary">Suivante →</button>
-            : <button onClick={() => (answeredCount < payload.questions.length ? confirm(`${payload.questions.length - answeredCount} question(s) sans réponse. Remettre quand même ?`) : true) && submit()} disabled={busy} className="btn-primary">{busy ? 'Remise…' : 'Remettre ma copie'}</button>}
+            ? <button onClick={() => setCurrent((c) => c + 1)} className="btn-primary">{perQuestion ? 'Valider et passer à la suivante →' : 'Suivante →'}</button>
+            : <button onClick={() => (perQuestion || answeredCount >= payload.questions.length ? true : confirm(`${payload.questions.length - answeredCount} question(s) sans réponse. Remettre quand même ?`)) && submit()} disabled={busy} className="btn-primary">{busy ? 'Remise…' : 'Remettre ma copie'}</button>}
         </div>
-        <p className="text-xs text-brown-800/50 mt-3">Vos réponses sont sauvegardées automatiquement. Vous pouvez naviguer librement entre les questions avant de remettre.</p>
+        <p className="text-xs text-brown-800/50 mt-3">{perQuestion ? 'Chaque question est chronométrée : sans réponse dans le temps imparti, elle est comptée fausse et la suivante s’affiche.' : 'Vos réponses sont sauvegardées automatiquement. Vous pouvez naviguer librement entre les questions avant de remettre.'}</p>
       </div>
     </LmsShell>
   );

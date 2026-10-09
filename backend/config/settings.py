@@ -173,6 +173,9 @@ SIMPLE_JWT = {
 
 # Frontend (liens dans les emails)
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:3000')
+LOGO_URL = config('LOGO_URL', default='') or f"{FRONTEND_URL.rstrip('/')}/logo-512.png"  # logo dans les emails
+# Panneau Django natif : réservé à la maintenance technique, désactivé en production sauf DJANGO_ADMIN_ENABLED=True
+DJANGO_ADMIN_ENABLED = config('DJANGO_ADMIN_ENABLED', default=DEBUG, cast=bool)
 
 # Identité de l'école sur les factures
 COMPANY_NAME = config('COMPANY_NAME', default='Kaho Auto-École')

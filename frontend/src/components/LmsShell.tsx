@@ -1,4 +1,5 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
+import api from '@/lib/api';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,8 +7,20 @@ import AppShell from './AppShell';
 import Logo from './Logo';
 
 // Pages du LMS accessibles connecté (espace élève) ou non (chapitre de démonstration).
+/** Comptabilise le temps passé sur le LMS (battement toutes les 60 s, élèves connectés uniquement). */
+export function useStudyHeartbeat(active = true) {
+  const { isAuthenticated, user } = useAuth();
+  useEffect(() => {
+    if (!active || !isAuthenticated || user?.role !== 'STUDENT') return;
+    const tick = () => { if (document.visibilityState === 'visible') api.post('/lms/exam-attempts/heartbeat/', { seconds: 60 }).catch(() => {}); };
+    const t = setInterval(tick, 60000);
+    return () => clearInterval(t);
+  }, [active, isAuthenticated, user]);
+}
+
 export default function LmsShell({ title, children }: { title: string; children: ReactNode }) {
   const { hasHydrated, isAuthenticated } = useAuth();
+  useStudyHeartbeat();
   if (hasHydrated && isAuthenticated) return <AppShell title={title}>{children}</AppShell>;
   return (
     <>

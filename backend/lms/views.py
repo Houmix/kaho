@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import Count, Max
+from django.db.models import Count, F as models_F, Max
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
@@ -10,7 +10,8 @@ from rest_framework.views import APIView
 
 from core.models import Offer, StudentProfile, User
 from core.permissions import IsStudent, IsSupervisorOrAdmin
-from .models import Course, Exam, ExamAttempt, Lesson, LessonProgress, Question, Quiz, QuizAttempt, Section
+from core.permissions import IsStaff
+from .models import Course, Exam, ExamAttempt, Lesson, LessonProgress, Question, Quiz, QuizAttempt, Section, StudyTime, THEMES, theme_label
 from .serializers import (
     CourseDetailSerializer, CourseSerializer, ExamAttemptSerializer, ExamSerializer, LessonDetailSerializer,
     QuizAttemptSerializer, QuizSerializer, SectionSerializer,
@@ -215,7 +216,7 @@ class ExamViewSet(viewsets.ReadOnlyModelViewSet):
         if not questions:
             return Response({'detail': "Aucune question disponible pour cet examen."}, status=400)
         attempt = ExamAttempt.objects.create(student=student, exam=exam, question_ids=[q.id for q in questions],
-                                             deadline=timezone.now() + timedelta(minutes=exam.duration_minutes))
+                                             deadline=timezone.now() + timedelta(seconds=exam.total_seconds))
         return Response(self._payload(attempt), status=201)
 
     def _payload(self, attempt):
@@ -287,22 +288,125 @@ class ExamAttemptViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['get'])
     def stats(self, request):
-        qs = self.get_queryset().exclude(status='IN_PROGRESS')
-        n = qs.count()
-        scores = list(qs.values_list('score', flat=True))
-        by_topic = {}
-        for a in qs.prefetch_related():
-            for q in Question.objects.filter(id__in=a.question_ids):
+        return Response(student_stats(_student(request)))
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def heartbeat(self, request):
+        """Temps passé : +N secondes (max 120) pour la journée. Appelé toutes les 60 s par les pages du LMS."""
+        st = _student(request)
+        if st:
+            sec = min(120, max(0, int(request.data.get('seconds') or 60)))
+            row, _ = StudyTime.objects.get_or_create(student=st, day=timezone.localdate())
+            StudyTime.objects.filter(pk=row.pk).update(seconds=models_F('seconds') + sec)
+        return Response({'ok': True})
+
+
+def student_stats(student):
+    """Analytics d'un élève : examens, préparation (5 derniers), évolution, thèmes, temps passé, séries."""
+    if student is None:
+        return {'attempts': 0, 'passed': 0, 'average': None, 'best': None, 'readiness': None, 'last_scores': [], 'evolution': [], 'by_topic': [],
+                'quiz_attempts': 0, 'time_seconds': 0, 'lessons_done': 0, 'etg_validated_at': None}
+    qs = ExamAttempt.objects.filter(student=student).exclude(status='IN_PROGRESS').select_related('exam')
+    n = qs.count()
+    scores = list(qs.values_list('score', flat=True))
+    by_topic = {}
+    for a in qs:
+        for q in Question.objects.filter(id__in=a.question_ids).prefetch_related('choices'):
+            ok, _ = q.grade_answer(a.answers.get(str(q.id)))
+            t = by_topic.setdefault(q.topic or '', {'code': q.topic or '', 'topic': theme_label(q.topic), 'correct': 0, 'total': 0})
+            t['total'] += 1
+            t['correct'] += int(ok)
+    # Quiz par thème : on complète les thèmes sans examen avec les quiz de section
+    for qa in QuizAttempt.objects.filter(student=student).select_related('quiz__section'):
+        code = qa.quiz.section.code if qa.quiz.section_id else ''
+        if code and code not in by_topic:
+            by_topic[code] = {'code': code, 'topic': theme_label(code), 'correct': 0, 'total': 0}
+    ordered = list(qs.order_by('submitted_at'))
+    last5 = [a.score for a in ordered[-5:]]
+    readiness = round(sum(last5) / len(last5)) if last5 else None
+    return {
+        'attempts': n, 'passed': qs.filter(passed=True).count(),
+        'average': round(sum(scores) / n) if n else None, 'best': max(scores) if scores else None,
+        'readiness': readiness, 'readiness_count': len(last5),
+        'last_scores': [a.score for a in ordered[-10:]],
+        'evolution': [{'date': a.submitted_at.date().isoformat() if a.submitted_at else None, 'score': a.score, 'passed': a.passed, 'exam': a.exam.title} for a in ordered[-30:]],
+        'by_topic': sorted([{**t, 'percent': round(100 * t['correct'] / t['total']) if t['total'] else None} for t in by_topic.values()], key=lambda x: (x['percent'] is None, x['percent'] or 0)),
+        'quiz_attempts': QuizAttempt.objects.filter(student=student).count(),
+        'time_seconds': sum(StudyTime.objects.filter(student=student).values_list('seconds', flat=True)),
+        'lessons_done': LessonProgress.objects.filter(student=student).count(),
+        'etg_validated_at': student.etg_validated_at,
+    }
+
+
+class RevisionView(APIView):
+    """Mode révision ciblée : les questions échouées (quiz et examens) de l'élève, par thème ; correction immédiate."""
+    permission_classes = [IsStudent]
+
+    def _failed(self, student):
+        failed = {}
+        for qa in QuizAttempt.objects.filter(student=student).select_related('quiz'):
+            for q in qa.quiz.questions.filter(is_published=True).prefetch_related('choices'):
+                ok, _ = q.grade_answer(qa.answers.get(str(q.id)))
+                if not ok:
+                    failed[q.id] = q
+        for a in ExamAttempt.objects.filter(student=student).exclude(status='IN_PROGRESS'):
+            for q in Question.objects.filter(id__in=a.question_ids, is_published=True).prefetch_related('choices'):
                 ok, _ = q.grade_answer(a.answers.get(str(q.id)))
-                t = by_topic.setdefault(q.topic or 'Général', {'topic': q.topic or 'Général', 'correct': 0, 'total': 0})
-                t['total'] += 1
-                t['correct'] += int(ok)
-        return Response({
-            'attempts': n, 'passed': qs.filter(passed=True).count(),
-            'average': round(sum(scores) / n) if n else None, 'best': max(scores) if scores else None,
-            'last_scores': [a.score for a in qs.order_by('-submitted_at')[:10]][::-1],
-            'by_topic': sorted([{**t, 'percent': round(100 * t['correct'] / t['total'])} for t in by_topic.values()], key=lambda x: x['percent']),
-        })
+                if not ok:
+                    failed[q.id] = q
+        return list(failed.values())
+
+    def get(self, request):
+        st = _student(request)
+        questions = self._failed(st)
+        topic = request.query_params.get('topic')
+        if topic:
+            questions = [q for q in questions if q.topic == topic]
+        by_topic = {}
+        for q in questions:
+            by_topic.setdefault(q.topic or '', 0)
+            by_topic[q.topic or ''] += 1
+        return Response({'count': len(questions), 'questions': [q.public() for q in questions[:30]],
+                         'topics': [{'code': c, 'label': theme_label(c), 'n': n} for c, n in sorted(by_topic.items(), key=lambda x: -x[1])]})
+
+    def post(self, request):
+        answers = request.data.get('answers') or {}
+        ids = [int(i) for i in answers.keys() if str(i).isdigit()]
+        items, correct = [], 0
+        for q in Question.objects.filter(id__in=ids).prefetch_related('choices'):
+            ok, good = q.grade_answer(answers.get(str(q.id)))
+            correct += ok
+            items.append({**q.public(), 'given': answers.get(str(q.id)), 'correct': ok, 'correct_answer': good, 'explanation_md': q.explanation_md})
+        total = len(items) or 1
+        return Response({'score': round(100 * correct / total), 'correct': correct, 'total': len(items), 'items': items})
+
+
+class AdminStudentLmsView(APIView):
+    """Relevé LMS d'un élève pour le moniteur / l'admin + validation de l'inscription à l'examen ETG."""
+    permission_classes = [IsStaff]
+
+    def get(self, request, student_id):
+        st = get_object_or_404(StudentProfile, pk=student_id)
+        data = student_stats(st)
+        data['history'] = ExamAttemptSerializer(ExamAttempt.objects.filter(student=st).exclude(status='IN_PROGRESS').select_related('exam')[:20], many=True).data
+        data['quizzes'] = QuizAttemptSerializer(QuizAttempt.objects.filter(student=st).select_related('quiz')[:20], many=True).data
+        data['has_lms_access'] = st.has_lms_access
+        data['etg_validated_by'] = st.etg_validated_by.get_full_name() if st.etg_validated_by else None
+        return Response(data)
+
+    def post(self, request, student_id):
+        """Valide (ou annule : {cancel: true}) l'inscription à l'examen officiel du code."""
+        from core.models import log_activity
+        st = get_object_or_404(StudentProfile, pk=student_id)
+        if str(request.data.get('cancel', 'false')).lower() in ('true', '1'):
+            st.etg_validated_at, st.etg_validated_by = None, None
+            msg = f"{st.user.get_full_name()} — validation ETG annulée"
+        else:
+            st.etg_validated_at, st.etg_validated_by = timezone.now(), request.user
+            msg = f"{st.user.get_full_name()} — niveau atteint, inscription à l'examen du code (ETG) validée"
+        st.save(update_fields=['etg_validated_at', 'etg_validated_by'])
+        log_activity('STATUS', msg, actor=request.user, student=st)
+        return Response({'etg_validated_at': st.etg_validated_at})
 
 
 # ---------- Démo publique ----------

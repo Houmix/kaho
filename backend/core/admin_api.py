@@ -19,7 +19,7 @@ from datetime import date as date_cls, datetime, time as time_cls
 
 from .models import (
     ActivityLog, Availability, Document, InstructorApplication, InstructorProfile, Invoice, Lesson, LessonRating,
-    MeetingPoint, Package, Slot, StudentProfile, Unavailability, User, log_activity,
+    MeetingPoint, Offer, Package, Slot, StudentProfile, Unavailability, User, log_activity,
 )
 from .scheduling import busy_periods
 from .permissions import IsOwner, IsSupervisorOrAdmin
@@ -27,7 +27,7 @@ from .serializers import (
     DocumentSerializer, InstructorAdminSerializer, InstructorApplicationSerializer, InstructorCreateSerializer,
     InstructorProfileSerializer, InvoiceSerializer, LessonSerializer, PackageSerializer, RatingModerationSerializer,
     SlotSerializer, StudentProfileSerializer, AvailabilitySerializer, BookingSerializer, TeamInviteSerializer,
-    TeamMemberSerializer, UnavailabilitySerializer, validate_upload,
+    TeamMemberSerializer, UnavailabilitySerializer, validate_upload, OfferAdminSerializer,
 )
 from .scheduling import is_window_free
 from .tasks import (
@@ -1107,3 +1107,30 @@ class AdminTeamViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         send_team_invite.delay(user.email, user.first_name, invite_link(user), user.get_role_display())
         return Response({'detail': f"Invitation renvoyée à {user.email}."})
+
+
+# ---------- Offres & tarifs (gérant) ----------
+
+class AdminOfferViewSet(viewsets.ModelViewSet):
+    """Catalogue : formules, tarifs, options (LMS, validité), ciblage du simulateur. Réservé au gérant."""
+    queryset = Offer.objects.all().order_by('display_order', 'price')
+    serializer_class = OfferAdminSerializer
+    permission_classes = [IsOwner]
+    pagination_class = None
+
+    def perform_create(self, serializer):
+        o = serializer.save()
+        log_activity('PAYMENT', f"Offre créée : {o.name} ({o.price} €)", actor=self.request.user)
+
+    def perform_update(self, serializer):
+        o = serializer.save()
+        log_activity('PAYMENT', f"Offre modifiée : {o.name} ({o.price} €)", actor=self.request.user)
+
+    def perform_destroy(self, instance):
+        if instance.packages.exists():
+            instance.is_active = False
+            instance.save(update_fields=['is_active'])
+            log_activity('PAYMENT', f"Offre désactivée (achats existants) : {instance.name}", actor=self.request.user)
+            return
+        log_activity('PAYMENT', f"Offre supprimée : {instance.name}", actor=self.request.user)
+        instance.delete()

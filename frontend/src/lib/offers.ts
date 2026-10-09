@@ -75,3 +75,6 @@ export function offerHighlights(o: Offer): string[] {
   if (o.gearbox !== 'ANY') h.push(o.gearbox === 'AUTO' ? 'Boîte automatique' : 'Boîte manuelle');
   return h;
 }
+
+export interface OfferAdmin extends Offer { is_active: boolean; display_order: number; sales: number; created_at: string }
+export const BILLING_LABELS = { ONE_TIME: 'Paiement unique', MONTHLY: 'Abonnement mensuel', INSTALLMENTS_3: 'En 3 fois', INSTALLMENTS_4: 'En 4 fois' };

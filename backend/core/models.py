@@ -72,6 +72,8 @@ class StudentProfile(models.Model):
     )
     lms_access = models.BooleanField("Accès cours de code / quiz", default=False)
     lms_access_until = models.DateField("Accès LMS jusqu'au (vide = illimité)", null=True, blank=True)
+    etg_validated_at = models.DateTimeField("Inscription à l'examen du code (ETG) validée le", null=True, blank=True)
+    etg_validated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

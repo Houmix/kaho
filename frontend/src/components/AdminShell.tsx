@@ -17,6 +17,7 @@ const NAV: { href: string; label: string; icon: string; soon?: boolean; external
   { href: '/admin/activity', label: 'Activité', icon: '≡' },
   { href: '/admin/sales', label: 'Ventes & factures', icon: '◫', owner: true },
   { href: '/admin/lms', label: 'Contenus LMS', icon: '▣' },
+  { href: '/admin/offers', label: 'Offres & tarifs', icon: '◈', owner: true },
   { href: '/admin/team', label: 'Équipe admin', icon: '⚑', owner: true },
 ];
 export const ROLE_LABELS: Record<string, string> = { OWNER: 'Gérant (super admin)', ADMIN: "Gestionnaire d'exploitation", SUPERVISOR: 'Superviseur', INSTRUCTOR: 'Moniteur', STUDENT: 'Élève' };
@@ -76,7 +77,6 @@ export default function AdminShell({ title, children, wide = false }: { title: s
   const { user, logout } = useAuth();
   const router = useRouter();
   const [drawer, setDrawer] = useState(false);
-  const adminUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '/admin/');
   const isActive = (href: string) => router.pathname === href || (href !== '/admin' && router.pathname.startsWith(href)) || (href === '/admin/calendar' && router.pathname === '/instructor/planning');
 
   const isOwner = user?.role === 'OWNER';
@@ -92,9 +92,6 @@ export default function AdminShell({ title, children, wide = false }: { title: s
           <span className="w-5 text-center">{n.icon}</span>{n.label}
         </Link>
       ))}
-      {isOwner && <a href={adminUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-brown-800 hover:bg-cream-200 mt-2 border-t border-cream-200 pt-3">
-        <span className="w-5 text-center">⚙</span>Paramètres avancés ↗
-      </a>}
     </nav>
   );
 

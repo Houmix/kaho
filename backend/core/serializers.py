@@ -451,6 +451,21 @@ class OfferSerializer(serializers.ModelSerializer):
         )
 
 
+class OfferAdminSerializer(serializers.ModelSerializer):
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    billing_display = serializers.CharField(source='get_billing_type_display', read_only=True)
+    sales = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Offer
+        fields = ('id', 'name', 'description', 'category', 'category_display', 'hours', 'price', 'billing_type', 'billing_display', 'includes_lms',
+                  'validity_months', 'for_code_status', 'for_level', 'gearbox', 'is_featured', 'is_active', 'display_order', 'sales', 'created_at')
+        read_only_fields = ('id', 'created_at')
+
+    def get_sales(self, obj):
+        return obj.packages.filter(status='COMPLETED').count()
+
+
 class RecommendationInputSerializer(serializers.Serializer):
     code_status = serializers.ChoiceField(choices=['TO_PASS', 'OBTAINED'])
     level = serializers.ChoiceField(choices=['BEGINNER', 'REFRESH'])

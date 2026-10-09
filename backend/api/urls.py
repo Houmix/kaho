@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from core.admin_api import (
-    AdminAbsenceViewSet, AdminActivityViewSet, AdminApplicationViewSet, AdminCalendarView, AdminDocumentViewSet, AdminInstructorViewSet, AdminInvoiceViewSet,
+    AdminAbsenceViewSet, AdminActivityViewSet, AdminApplicationViewSet, AdminOfferViewSet, AdminCalendarView, AdminDocumentViewSet, AdminInstructorViewSet, AdminInvoiceViewSet,
     AdminOverviewView, AdminPackageViewSet, AdminPayrollView, AdminRatingViewSet, AdminSalesView, AdminSearchView,
     AdminSlotViewSet, AdminStudentViewSet, AdminTeamViewSet, InstructorApplicationPublicView,
 )
@@ -39,6 +39,7 @@ router.register(r'admin/activity', AdminActivityViewSet, basename='admin-activit
 router.register(r'admin/documents', AdminDocumentViewSet, basename='admin-document')
 router.register(r'admin/absences', AdminAbsenceViewSet, basename='admin-absence')
 router.register(r'admin/team', AdminTeamViewSet, basename='admin-team')
+router.register(r'admin/offers', AdminOfferViewSet, basename='admin-offer')
 
 urlpatterns = [
     path('', include(router.urls)),

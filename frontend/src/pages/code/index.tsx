@@ -4,6 +4,7 @@ import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import LmsShell, { UpsellBanner } from '@/components/LmsShell';
 import { CourseItem, ExamAttempt, ExamItem, ExamStats, Upsell } from '@/lib/lms';
+import { ReadinessGauge, ScoreChart, StatTiles, TopicBars } from '@/components/LmsAnalytics';
 import { frDate } from '@/lib/types';
 
 export default function LmsHome() {
@@ -50,31 +51,27 @@ export default function LmsHome() {
           <div key={e.id} className="card">
             <div className="flex items-start justify-between gap-2"><h3 className="text-xl">{e.title}</h3>{e.is_demo && <span className="badge bg-caramel/40 text-brown-900">essai gratuit</span>}</div>
             <p className="text-sm text-brown-800/70 mt-1">{e.description}</p>
-            <p className="text-xs text-brown-800/60 mt-2">{Math.min(e.question_count, e.available_questions)} questions · {e.duration_minutes} min · réussite à {e.pass_score} %{e.attempts ? ` · ${e.attempts} tentative(s), meilleur score ${e.best_score} %` : ''}</p>
+            <p className="text-xs text-brown-800/60 mt-2">{Math.min(e.question_count, e.available_questions)} questions · {e.seconds_per_question ? `${e.seconds_per_question} s par question` : `${e.duration_minutes} min`} · réussite à {e.pass_score} %{e.attempts ? ` · ${e.attempts} tentative(s), meilleur score ${e.best_score} %` : ''}</p>
             <Link href={e.is_demo && !isAuthenticated ? '/demo' : `/code/exam/${e.id}`} className="btn-primary mt-4 !py-2 text-sm">{e.attempts ? 'Refaire un examen' : 'Commencer'}</Link>
           </div>
         ))}
         {exams && exams.exams.length === 0 && <p className="text-brown-800/60">Aucun examen disponible.</p>}
       </div>
 
-      {stats && stats.attempts > 0 && (
+      {stats && (
         <section className="card mb-10">
-          <h2 className="text-xl mb-4">Vos statistiques</h2>
-          <div className="grid sm:grid-cols-4 gap-4 mb-6">
-            <div><p className="text-sm text-brown-800/70">Examens passés</p><p className="text-2xl font-display">{stats.attempts}</p></div>
-            <div><p className="text-sm text-brown-800/70">Réussis</p><p className="text-2xl font-display">{stats.passed}</p></div>
-            <div><p className="text-sm text-brown-800/70">Moyenne</p><p className="text-2xl font-display">{stats.average} %</p></div>
-            <div><p className="text-sm text-brown-800/70">Meilleur score</p><p className="text-2xl font-display">{stats.best} %</p></div>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4"><h2 className="text-xl">Votre préparation</h2>{stats.etg_validated_at && <span className="badge bg-brown-700 text-cream-50">Inscription à l'examen du code validée par votre école ✓</span>}</div>
+          <div className="grid lg:grid-cols-[220px_1fr] gap-6 items-start">
+            <ReadinessGauge value={stats.readiness} count={stats.readiness_count} />
+            <StatTiles s={stats} />
           </div>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-sm font-medium mb-2">Derniers scores</p>
-              <div className="flex items-end gap-1 h-24">{stats.last_scores.map((s, i) => <div key={i} className="flex-1 flex flex-col justify-end" title={`${s} %`}><div className={`rounded-t ${s >= 80 ? 'bg-brown-700' : 'bg-caramel'}`} style={{ height: `${Math.max(4, s)}%` }} /></div>)}</div>
-            </div>
-            <div>
-              <p className="text-sm font-medium mb-2">Par thème (du plus faible au plus fort)</p>
-              <ul className="space-y-1.5 text-sm">{stats.by_topic.map((t) => <li key={t.topic} className="flex items-center gap-2"><span className="w-28 truncate">{t.topic}</span><div className="flex-1 h-1.5 bg-cream-200 rounded-full overflow-hidden"><div className={`h-full ${t.percent >= 80 ? 'bg-brown-700' : 'bg-caramel'}`} style={{ width: `${t.percent}%` }} /></div><span className="w-10 text-right text-brown-800/70">{t.percent} %</span></li>)}</ul>
-            </div>
+          <div className="grid md:grid-cols-2 gap-6 mt-6">
+            <div><p className="text-sm font-medium mb-2">Évolution des scores (ligne pointillée : seuil de réussite)</p><ScoreChart points={stats.evolution} /></div>
+            <div><p className="text-sm font-medium mb-2">Thème par thème</p><TopicBars topics={stats.by_topic} /></div>
+          </div>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-cream-200 pt-4">
+            <p className="text-sm text-brown-800/70">Révision ciblée : refaites en priorité les questions que vous avez manquées.</p>
+            <Link href="/code/revision" className="btn-primary !py-2 text-sm">Réviser mes erreurs</Link>
           </div>
         </section>
       )}

@@ -10,6 +10,26 @@ from django.utils.text import slugify
 
 # ---------- Contenu ----------
 
+# Les 10 thèmes officiels de l'épreuve théorique générale (ETG) et la répartition indicative des 40 questions
+THEMES = [
+    ('L', 'La circulation routière', 'Signalisation, panneaux, règles de priorité, intersections, vitesses', 10),
+    ('C', 'Le conducteur', 'Vigilance, fatigue, alcool, drogues, médicaments, vision, temps de réaction', 7),
+    ('R', 'La route', 'Conduite nocturne, intempéries, adhérence, chaussée dégradée, autoroute', 4),
+    ('U', 'Les autres usagers', 'Partage de la route, piétons, cyclistes, deux-roues, véhicules lourds', 3),
+    ('D', 'Réglementation générale', 'Papiers du véhicule, permis à points, infractions, contrôle technique, équipements', 3),
+    ('P', 'Prendre et quitter son véhicule', 'Installation au poste de conduite, passagers, sécurité des enfants', 2),
+    ('M', 'Éléments mécaniques et de sécurité', 'Commandes, voyants du tableau de bord, pneumatiques, entretien', 3),
+    ('S', 'Équipements de sécurité des véhicules', 'Ceinture, airbags, aides à la conduite, ABS, ESP', 3),
+    ('E', "L'environnement", 'Éco-conduite, pollution, consommations, choix du véhicule', 3),
+    ('A', 'Premiers secours', 'Protéger, Alerter, Secourir (PAS), comportement en cas d’accident', 2),
+]
+THEME_LABELS = {code: title for code, title, _, _ in THEMES}
+DEFAULT_DISTRIBUTION = {code: n for code, _, _, n in THEMES}
+
+
+def theme_label(code):
+    return f"{code} — {THEME_LABELS[code]}" if code in THEME_LABELS else (code or 'Général')
+
 class Course(models.Model):
     title = models.CharField("Titre", max_length=150)
     slug = models.SlugField(unique=True, blank=True)
@@ -41,6 +61,7 @@ class Course(models.Model):
 class Section(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='sections')
     title = models.CharField("Titre", max_length=150)
+    code = models.CharField("Thème officiel", max_length=2, blank=True, choices=[(c, f"{c} — {t}") for c, t, _, _ in THEMES], help_text="Lettre du thème ETG (L, C, R, U, D, P, M, S, E, A)")
     order = models.PositiveIntegerField("Ordre", default=0)
     is_free_preview = models.BooleanField("Chapitre de démonstration (accès libre sans compte)", default=False)
     unlock_threshold = models.PositiveSmallIntegerField(
@@ -206,6 +227,8 @@ class Exam(models.Model):
     question_count = models.PositiveSmallIntegerField("Nombre de questions", default=40)
     pass_score = models.PositiveSmallIntegerField("Score de réussite (%)", default=88, help_text="ETG officiel : 35/40 = 87,5 %")
     topics = models.CharField("Thèmes (séparés par des virgules, vide = tous)", max_length=300, blank=True)
+    seconds_per_question = models.PositiveSmallIntegerField("Secondes par question (0 = chrono global uniquement)", default=20)
+    distribution = models.JSONField("Répartition par thème (code → nombre de questions)", default=dict, blank=True, help_text="Vide = tirage aléatoire simple")
     is_published = models.BooleanField("Publié", default=True)
     is_demo = models.BooleanField("Série d'essai gratuite (sans compte)", default=False)
     order = models.PositiveIntegerField(default=0)
@@ -218,13 +241,37 @@ class Exam(models.Model):
     def __str__(self):
         return self.title
 
+    @property
+    def total_seconds(self):
+        """Temps total alloué : chrono par question × nombre de questions (+ marge), sinon la durée globale."""
+        if self.seconds_per_question:
+            return self.question_count * self.seconds_per_question + 30
+        return self.duration_minutes * 60
+
     def draw_questions(self):
+        """Tirage aléatoire ; si une répartition par thème est définie, même répartition statistique que l'examen national
+        (complétée aléatoirement si un thème manque de questions)."""
         qs = Question.objects.filter(in_exam_bank=True, is_published=True).prefetch_related('choices')
         if self.topics.strip():
             qs = qs.filter(topic__in=[t.strip() for t in self.topics.split(',') if t.strip()])
         pool = list(qs)
         random.shuffle(pool)
-        return pool[:self.question_count]
+        if not self.distribution:
+            return pool[:self.question_count]
+        chosen, used = [], set()
+        by_topic = {}
+        for q in pool:
+            by_topic.setdefault(q.topic, []).append(q)
+        for code, n in self.distribution.items():
+            for q in by_topic.get(code, [])[:int(n)]:
+                chosen.append(q); used.add(q.id)
+        for q in pool:
+            if len(chosen) >= self.question_count:
+                break
+            if q.id not in used:
+                chosen.append(q); used.add(q.id)
+        random.shuffle(chosen)
+        return chosen[:self.question_count]
 
 
 # ---------- Suivi ----------
@@ -236,6 +283,16 @@ class LessonProgress(models.Model):
 
     class Meta:
         unique_together = ('student', 'lesson')
+
+
+class StudyTime(models.Model):
+    """Temps passé sur la plateforme (battements de cœur envoyés par les pages de cours / quiz / examens)."""
+    student = models.ForeignKey('core.StudentProfile', on_delete=models.CASCADE, related_name='study_time')
+    day = models.DateField()
+    seconds = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = ('student', 'day')
 
 
 class QuizAttempt(models.Model):

@@ -8,7 +8,17 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+import os
+
+LOGO_PATH = os.path.join(os.path.dirname(__file__), 'assets', 'logo.png')
+
+
+def logo_cell(size_mm=18):
+    """Logo de l'école pour l'en-tête des PDF (facture, contrat, attestation)."""
+    if not os.path.exists(LOGO_PATH):
+        return ''
+    return Image(LOGO_PATH, width=size_mm * mm, height=size_mm * mm)
 
 BROWN = colors.HexColor('#5C3D2E')
 CREAM = colors.HexColor('#F5EFE6')
@@ -52,7 +62,7 @@ def build_invoice_pdf(invoice) -> bytes:
         [Paragraph('Statut', base), Paragraph(status_label + (f" le {_fr(invoice.paid_at.date())}" if invoice.paid_at else ''), bold)],
     ]
     header = Table([[
-        Paragraph('<br/>'.join(company_lines), base),
+        Table([[logo_cell(), Paragraph('<br/>'.join(company_lines), base)]], colWidths=[22 * mm, 78 * mm], style=TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LEFTPADDING', (0, 0), (-1, -1), 0)])),
         Table(meta, colWidths=[22 * mm, 48 * mm], style=TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('BOTTOMPADDING', (0, 0), (-1, -1), 2), ('TOPPADDING', (0, 0), (-1, -1), 2)])),
     ]], colWidths=[100 * mm, 74 * mm])
     header.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))

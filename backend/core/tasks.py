@@ -60,11 +60,12 @@ def _send_sms(phone, body):
 def _layout(title, body_html):
     return f"""
     <div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;color:#2B1D14">
-      <div style="background:#5C3D2E;color:#FBF8F3;padding:16px 24px;border-radius:12px 12px 0 0;font-size:20px;font-weight:600">Kaho</div>
+      <div style="background:#5C3D2E;color:#FBF8F3;padding:14px 24px;border-radius:12px 12px 0 0;font-size:20px;font-weight:600;display:flex;align-items:center;gap:12px">
+        <img src="{settings.LOGO_URL}" alt="" width="36" height="36" style="display:inline-block;vertical-align:middle;border-radius:8px;background:#FBF8F3;padding:3px;margin-right:12px" />Kaho</div>
       <div style="background:#FBF8F3;padding:24px;border:1px solid #EAE0D2;border-top:0;border-radius:0 0 12px 12px">
         <h2 style="margin-top:0;color:#5C3D2E">{title}</h2>
         {body_html}
-        <p style="color:#8B5E3C;font-size:13px;margin-top:24px">Kaho — auto-école &amp; centre de formation</p>
+        <p style="color:#8B5E3C;font-size:13px;margin-top:24px">{settings.COMPANY_NAME} — auto-école &amp; centre de formation{(' · ' + settings.COMPANY_ADDRESS) if settings.COMPANY_ADDRESS else ''}</p>
       </div>
     </div>"""
 
