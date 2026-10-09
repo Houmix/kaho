@@ -13,6 +13,7 @@ const NAV: { href: string; label: string; icon: string; soon?: boolean; external
   { href: '/admin/instructors', label: 'Formateurs', icon: '◆' },
   { href: '/admin/calendar', label: 'Planning', icon: '▤' },
   { href: '/admin/meeting-points', label: 'Points de RDV', icon: '⌖' },
+  { href: '/admin/cancellation', label: 'Règles d’annulation', icon: '⊘' },
   { href: '/admin/reviews', label: 'Avis', icon: '★' },
   { href: '/instructor/performance', label: 'Performance', icon: '◔' },
   { href: '/admin/activity', label: 'Activité', icon: '≡' },

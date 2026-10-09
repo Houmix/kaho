@@ -6,6 +6,7 @@ import { BACKOFFICE, useRequireAuth } from '@/hooks/useRequireAuth';
 import AdminShell from '@/components/AdminShell';
 import ProgressGauge from '@/components/ProgressGauge';
 import PdfLink from '@/components/PdfLink';
+import BackLink from '@/components/BackLink';
 import StudentActions, { ActionKey } from '@/components/StudentActions';
 import { ActivityEntry, InstructorAdmin, StudentOverview, downloadFile } from '@/lib/admin';
 import { formatPrice } from '@/lib/offers';
@@ -107,7 +108,7 @@ export default function AdminStudentDetail() {
 
   return (
     <AdminShell title={`${s.user.first_name} ${s.user.last_name}`} wide>
-      <Link href="/admin/students" className="text-sm text-brown-700 hover:underline">← Apprenants</Link>
+      <BackLink fallbackHref="/admin/students" fallbackLabel="← Apprenants" />
       <div className="flex flex-wrap items-start justify-between gap-3 mt-2 mb-4">
         <div>
           <h1 className="text-3xl">{s.user.first_name} {s.user.last_name}</h1>
@@ -269,7 +270,7 @@ export default function AdminStudentDetail() {
             <tbody>
               {[...d.upcoming_slots, ...d.past_slots].map((sl) => (
                 <tr key={sl.id} className="border-t border-cream-200"><td className="py-2 px-4">{frDate(sl.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</td><td className="py-2 px-4">{hm(sl.start_time)}–{hm(sl.end_time)}</td><td className="py-2 px-4">{sl.instructor_name}</td><td className="py-2 px-4">{sl.meeting_point_name}</td><td className="py-2 px-4">{sl.status_display}{sl.hours_refunded && ' · re-crédité'}</td>
-                  <td className="py-2 px-4 text-right text-xs">{sl.status === 'BOOKED' && !sl.is_past && <button onClick={() => confirm('Annuler cette leçon (sans débit) ?') && act(() => api.post(`/slots/${sl.id}/cancel/`), 'Leçon annulée.')} className="text-red-700 hover:underline">Annuler</button>}{(sl.status === 'NO_SHOW' || sl.status === 'CANCELLED_LATE') && sl.hours_debited && !sl.hours_refunded && <button onClick={() => { const n = prompt('Justificatif du re-crédit :'); if (n) act(() => api.post(`/slots/${sl.id}/refund/`, { note: n }), 'Heure re-créditée.'); }} className="text-brown-700 hover:underline">Re-créditer</button>}</td></tr>
+                  <td className="py-2 px-4 text-right text-xs">{sl.status === 'BOOKED' && !sl.is_past && <button onClick={() => confirm('Annuler cette leçon (sans débit) ?') && act(() => api.post(`/slots/${sl.id}/cancel/`, { reason: prompt('Motif de l’annulation (facultatif) :') ?? '' }), 'Leçon annulée.')} className="text-red-700 hover:underline">Annuler</button>}{(sl.status === 'NO_SHOW' || sl.status === 'CANCELLED_LATE') && ((sl.hours_debited && !sl.hours_refunded) || Number(sl.cancellation_fee) > 0) && <button onClick={() => { const n = prompt('Justificatif du re-crédit :'); if (n) act(() => api.post(`/slots/${sl.id}/refund/`, { note: n }), 'Heure re-créditée.'); }} className="text-brown-700 hover:underline">Re-créditer</button>}</td></tr>
               ))}
             </tbody>
           </table>

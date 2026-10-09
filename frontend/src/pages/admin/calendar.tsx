@@ -88,17 +88,19 @@ export default function AdminCalendar() {
         <aside className="card h-fit lg:sticky lg:top-20">
           {!selected ? <p className="text-sm text-brown-800/60">Cliquez sur un créneau pour le détailler.</p> : (
             <div className="text-sm space-y-2">
-              <div className="flex justify-between items-start"><h2 className="text-lg font-semibold">{selected.student_name ?? 'Créneau libre'}</h2><button onClick={() => setSelected(null)} className="text-brown-800/50">✕</button></div>
+              <div className="flex justify-between items-start"><h2 className="text-lg font-semibold">{selected.student ? <Link href={`/admin/students/${selected.student}?from=calendar`} className="hover:underline">{selected.student_name}</Link> : 'Créneau libre'}</h2><button onClick={() => setSelected(null)} className="text-brown-800/50">✕</button></div>
               <p>{frDate(selected.date)} · {hm(selected.start_time)}–{hm(selected.end_time)}</p>
               <p className="text-brown-800/70">{selected.instructor_name} · {selected.meeting_point_name}</p>
               <p><span className="badge bg-cream-200 text-brown-800">{selected.status_display}</span>{selected.has_lesson && <span className="badge bg-brown-700 text-cream-50 ml-1">bilan saisi</span>}</p>
-              {selected.student && <Link href={`/admin/students/${selected.student}`} className="text-brown-700 hover:underline">Fiche élève →</Link>}
+              {selected.student && <Link href={`/admin/students/${selected.student}?from=calendar`} className="text-brown-700 hover:underline">Fiche élève →</Link>}
+              {selected.cancel_reason && <p className="text-brown-800/70">Motif : {selected.cancel_reason}</p>}
+              {Number(selected.cancellation_fee) > 0 && <p className="text-brown-800/70">Frais d'annulation : {Number(selected.cancellation_fee).toFixed(2)} €</p>}
               {selected.status === 'BOOKED' && !selected.is_past && data && (
                 <div className="pt-3 border-t border-cream-200 space-y-2">
                   <label className="block"><span className="text-brown-800/70">Réattribuer à</span>
                     <select value={reassign} onChange={(e) => setReassign(e.target.value)} className="input-field !py-1.5 mt-1">{data.instructors.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></label>
                   <button disabled={Number(reassign) === selected.instructor} onClick={() => move(selected, { date: selected.date, start_time: hm(selected.start_time), instructor: Number(reassign) })} className="btn-primary !py-1.5 w-full disabled:opacity-40">Réattribuer et prévenir l'élève</button>
-                  <button onClick={() => { if (confirm('Annuler ce créneau (sans frais pour l’élève) ?')) api.post(`/slots/${selected.id}/cancel/`).then(() => { setSelected(null); load(); setMsg({ ok: true, text: 'Créneau annulé.' }); }).catch((err) => setMsg({ ok: false, text: apiError(err, 'Annulation impossible.') })); }} className="btn-outline !py-1.5 w-full text-red-700 border-red-300">Annuler le créneau</button>
+                  <button onClick={() => { if (confirm('Annuler ce créneau (sans frais pour l’élève) ?')) api.post(`/slots/${selected.id}/cancel/`, { reason: prompt('Motif de l’annulation (facultatif) :') ?? '' }).then(() => { setSelected(null); load(); setMsg({ ok: true, text: 'Créneau annulé.' }); }).catch((err) => setMsg({ ok: false, text: apiError(err, 'Annulation impossible.') })); }} className="btn-outline !py-1.5 w-full text-red-700 border-red-300">Annuler le créneau</button>
                 </div>
               )}
             </div>

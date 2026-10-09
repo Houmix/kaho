@@ -98,7 +98,7 @@ class AdminOverviewView(APIView):
         occupancy = round(100 * booked / opened) if opened else None
 
         rating = LessonRating.objects.filter(is_hidden=False).aggregate(avg=Avg('score'), n=Count('id'))
-        to_review = sum(1 for s in Slot.objects.filter(status='BOOKED', date__lte=today, lesson__isnull=True) if s.is_past)
+        to_review = sum(1 for s in Slot.objects.filter(status='BOOKED', date__lte=today, lesson__isnull=True) if s.can_assess)
 
         return Response({
             'month': {

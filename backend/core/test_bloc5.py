@@ -90,7 +90,7 @@ class CalendarAndActivityTests(APITestCase):
         self.auth('eleve@test.fr', 'testpass123')
         r = self.client.post('/api/slots/book/', {'instructor': self.claire.id, 'meeting_point': self.point.id, 'date': self.monday.isoformat(), 'start_time': '10:00', 'end_time': '11:00'})
         self.assertEqual(r.status_code, 201, r.content)
-        self.client.post(f"/api/slots/{r.data['id']}/cancel/")
+        self.client.post(f"/api/slots/{r.data['id']}/cancel/", {'reason': 'Imprévu'}, format='json')
         self.auth('a@kaho.app')
         d = self.client.get('/api/admin/activity/').data
         self.assertEqual([e['kind'] for e in d['results'][:2]], ['CANCELLATION', 'BOOKING'])

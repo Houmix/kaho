@@ -1,5 +1,6 @@
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from django.conf import settings as dj_settings
@@ -7,6 +8,7 @@ from django.conf import settings as dj_settings
 from .models import (
     User, StudentProfile, InstructorProfile, InstructorApplication, Availability, Unavailability, MeetingPoint, Slot,
     Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Invoice, Document, VehicleLog,
+    CancellationPolicy,
 )
 
 
@@ -292,7 +294,10 @@ class AvailabilitySerializer(serializers.ModelSerializer):
         fields = ('id', 'weekday', 'weekday_display', 'start_time', 'end_time', 'meeting_point', 'meeting_point_name')
 
     def validate(self, data):
-        if data['end_time'] <= data['start_time']:
+        # PATCH partiel : on complète avec les valeurs déjà enregistrées
+        start = data.get('start_time', getattr(self.instance, 'start_time', None))
+        end = data.get('end_time', getattr(self.instance, 'end_time', None))
+        if start and end and end <= start:
             raise serializers.ValidationError("L'heure de fin doit être après l'heure de début.")
         return data
 
@@ -355,6 +360,9 @@ class SlotSerializer(serializers.ModelSerializer):
     is_past = serializers.BooleanField(read_only=True)
     has_lesson = serializers.SerializerMethodField()
     lesson_id = serializers.SerializerMethodField()
+    can_assess = serializers.BooleanField(read_only=True)
+    assessment_opens_at = serializers.DateTimeField(read_only=True)
+    free_cancel_until = serializers.SerializerMethodField()
 
     class Meta:
         model = Slot
@@ -362,9 +370,16 @@ class SlotSerializer(serializers.ModelSerializer):
             'id', 'date', 'start_time', 'end_time', 'status', 'status_display', 'meeting_point',
             'meeting_point_name', 'student', 'student_name', 'instructor', 'instructor_name',
             'duration_hours', 'is_past', 'has_lesson', 'lesson_id', 'cancelled_at',
-            'hours_debited', 'hours_refunded', 'refund_note', 'created_at', 'updated_at',
+            'hours_debited', 'hours_refunded', 'refund_note', 'cancel_reason', 'cancellation_fee',
+            'can_assess', 'assessment_opens_at', 'free_cancel_until', 'created_at', 'updated_at',
         )
         read_only_fields = fields
+
+    def get_free_cancel_until(self, obj):
+        if obj.status != 'BOOKED':
+            return None
+        from datetime import timedelta
+        return obj.starts_at - timedelta(hours=CancellationPolicy.current().notice_hours)
 
     def get_has_lesson(self, obj):
         return hasattr(obj, 'lesson')
@@ -424,6 +439,10 @@ class LessonSerializer(serializers.ModelSerializer):
     def validate_slot_id(self, slot):
         if hasattr(slot, 'lesson'):
             raise serializers.ValidationError("Un bilan existe déjà pour ce créneau.")
+        if not slot.can_assess:
+            opens = timezone.localtime(slot.assessment_opens_at)
+            raise serializers.ValidationError(
+                f"Le bilan ne peut être saisi qu'à partir de {opens:%H:%M} le {opens:%d/%m} (10 dernières minutes de la leçon).")
         request = self.context.get('request')
         if request and request.user.role == 'INSTRUCTOR' and slot.instructor_id != request.user.id:
             raise serializers.ValidationError("Ce créneau n'est pas le vôtre.")
@@ -601,3 +620,20 @@ class FrenchTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         attrs[self.username_field] = (attrs.get(self.username_field) or '').strip().lower()
         return super().validate(attrs)
+
+
+class CancellationPolicySerializer(serializers.ModelSerializer):
+    penalty_display = serializers.CharField(source='get_late_penalty_display', read_only=True)
+    late_description = serializers.CharField(source='describe_late', read_only=True)
+
+    class Meta:
+        model = CancellationPolicy
+        fields = ('notice_hours', 'late_penalty', 'penalty_display', 'late_fee', 'late_description', 'updated_at')
+        read_only_fields = ('updated_at',)
+
+    def validate(self, data):
+        penalty = data.get('late_penalty', getattr(self.instance, 'late_penalty', 'DEBIT_HOUR'))
+        fee = data.get('late_fee', getattr(self.instance, 'late_fee', 0))
+        if penalty in ('FEE', 'DEBIT_AND_FEE') and not fee:
+            raise serializers.ValidationError({'late_fee': "Indiquez le montant des frais d'annulation."})
+        return data

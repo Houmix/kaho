@@ -5,6 +5,7 @@ import api from '@/lib/api';
 import { STAFF_ROLES, useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
 import ProgressGauge from '@/components/ProgressGauge';
+import BackLink from '@/components/BackLink';
 import { AssessmentStatus, Competency, Lesson, Logbook, STATUS_LABELS, Slot, apiError, frDate, hm } from '@/lib/types';
 
 type Choice = Exclude<AssessmentStatus, 'NOT_COVERED'>;
@@ -57,7 +58,7 @@ export default function LessonForm() {
     try {
       if (existing) await api.patch(`/lessons/${existing.id}/`, payload);
       else await api.post('/lessons/', payload);
-      router.push('/instructor/dashboard');
+      router.push(router.query.from === 'planning' ? '/instructor/planning' : '/instructor/dashboard');
     } catch (err) {
       setError(apiError(err, 'Impossible d’enregistrer le bilan.'));
     } finally { setBusy(false); }
@@ -65,16 +66,19 @@ export default function LessonForm() {
 
   if (!slot) return <AppShell title="Bilan de leçon"><p className="text-brown-500">Chargement…</p></AppShell>;
 
+  const locked = !existing && !slot.can_assess;
+  const opens = new Date(slot.assessment_opens_at);
+  const opensLabel = `${opens.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}${opens.toDateString() === new Date().toDateString() ? '' : ' le ' + opens.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
   const current = new Map(logbook?.competencies.map((c) => [c.id, c.status]) ?? []);
   const groups = Array.from(new Set(competencies.map((c) => c.group))).sort();
 
   return (
     <AppShell title="Bilan de leçon">
-      <Link href="/instructor/dashboard" className="text-sm text-brown-700 hover:underline">← Tableau de bord</Link>
+      <BackLink fallbackHref="/instructor/dashboard" fallbackLabel="← Retour au tableau de bord" />
       <h1 className="text-3xl mt-2 mb-1">{existing ? 'Modifier le bilan' : 'Bilan de leçon'}</h1>
       <p className="text-brown-800/70 mb-2">{slot.student_name} · {frDate(slot.date)} · {hm(slot.start_time)}–{hm(slot.end_time)} · {slot.meeting_point_name}</p>
       {slot.student && <div className="flex flex-wrap gap-2 mb-6">
-        <Link href={`/instructor/students/${slot.student}`} className="btn-secondary !py-1.5 text-sm">Fiche élève & historique</Link>
+        <Link href={`/instructor/students/${slot.student}?from=planning`} className="btn-secondary !py-1.5 text-sm">Fiche élève & historique</Link>
         {logbook?.student.phone && <a href={`tel:${logbook.student.phone}`} className="btn-secondary !py-1.5 text-sm">📞 Appeler</a>}
         {logbook?.student.phone && <a href={`sms:${logbook.student.phone}`} className="btn-secondary !py-1.5 text-sm">💬 SMS</a>}
         {logbook?.student.user.email && <a href={`mailto:${logbook.student.user.email}`} className="btn-secondary !py-1.5 text-sm">✉ Email</a>}
@@ -88,7 +92,13 @@ export default function LessonForm() {
       )}
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 mb-6 text-sm">{error}</div>}
+      {locked && (
+        <div className="rounded-xl border border-caramel bg-brown-50 px-4 py-3 mb-6 text-sm" role="status">
+          🔒 <strong>Bilan verrouillé.</strong> Il pourra être saisi à partir de {opensLabel} (10 dernières minutes de la leçon), puis après sa fin.
+        </div>
+      )}
 
+      <fieldset disabled={locked} className={locked ? 'opacity-50' : ''}>
       <section className="card mb-6 space-y-4">
         <label className="flex items-center gap-3">
           <input type="checkbox" checked={attended} onChange={(e) => setAttended(e.target.checked)} className="w-5 h-5 accent-brown-700" />
@@ -139,9 +149,11 @@ export default function LessonForm() {
         </div>
       </section>
 
+      </fieldset>
+
       <div className="flex flex-wrap gap-3">
-        <button onClick={submit} disabled={busy} className="btn-primary disabled:opacity-60">{busy ? 'Enregistrement…' : existing ? 'Mettre à jour le bilan' : 'Enregistrer le bilan'}</button>
-        <Link href="/instructor/dashboard" className="btn-secondary">Annuler</Link>
+        <button onClick={submit} disabled={busy || locked} className="btn-primary disabled:opacity-60">{busy ? 'Enregistrement…' : existing ? 'Mettre à jour le bilan' : 'Enregistrer le bilan'}</button>
+        <Link href={router.query.from === 'planning' ? '/instructor/planning' : '/instructor/dashboard'} className="btn-secondary">Annuler</Link>
       </div>
     </AppShell>
   );

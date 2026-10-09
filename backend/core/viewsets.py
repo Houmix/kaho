@@ -7,10 +7,11 @@ from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import (
     User, StudentProfile, InstructorProfile, Availability, Unavailability, MeetingPoint, Slot,
-    Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Invoice, Document, VehicleLog, log_activity,
+    Competency, Lesson, CompetencyAssessment, LessonRating, Offer, Package, Invoice, Document, VehicleLog, CancellationPolicy, log_activity,
 )
 from .permissions import IsInstructor, IsStaff, IsStudent, IsSupervisorOrAdmin
 from .scheduling import availability_meeting_point, free_windows, is_window_free
@@ -19,6 +20,7 @@ from .serializers import (
     AvailabilitySerializer, UnavailabilitySerializer, FreeWindowSerializer, BookingSerializer,
     MeetingPointSerializer, SlotSerializer, CompetencySerializer, LessonSerializer, LessonRatingSerializer,
     OfferSerializer, RecommendationInputSerializer, PackageSerializer, InvoiceSerializer, DocumentSerializer, VehicleLogSerializer,
+    CancellationPolicySerializer,
 )
 from .tasks import send_booking_confirmation
 
@@ -136,7 +138,7 @@ class InstructorViewSet(viewsets.ReadOnlyModelViewSet):
                     .select_related('student__user', 'meeting_point')[:50])
         to_review = (Slot.objects.filter(instructor=user, status='BOOKED', date__lte=today, lesson__isnull=True)
                      .select_related('student__user', 'meeting_point').order_by('-date', '-start_time'))
-        to_review = [s for s in to_review if s.is_past]
+        to_review = [s for s in to_review if s.can_assess]
         month_lessons = Lesson.objects.filter(
             slot__instructor=user, attended=True, slot__date__year=today.year, slot__date__month=today.month
         ).select_related('slot')
@@ -292,23 +294,40 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
-        """Élève : gratuit avant le délai, débité après. Staff : toujours gratuit."""
+        """Élève : règles de l'école (préavis gratuit, pénalité au-delà), motif obligatoire. Staff : toujours sans frais."""
         slot = self.get_object()
         if slot.status != 'BOOKED':
             return Response({'detail': 'Ce créneau ne peut pas être annulé.'}, status=400)
+        reason = str(request.data.get('reason') or '').strip()[:500]
+        policy = CancellationPolicy.current()
         late = False
         if request.user.role == 'STUDENT':
+            if not reason:
+                return Response({'detail': "Merci d'indiquer le motif de l'annulation."}, status=400)
             if slot.is_past:
                 return Response({'detail': 'Ce créneau est déjà passé.'}, status=400)
-            late = slot.starts_at - timezone.now() < timedelta(hours=settings.BOOKING_CANCEL_DEADLINE_HOURS)
+            late = slot.starts_at - timezone.now() < timedelta(hours=policy.notice_hours)
         slot.status = 'CANCELLED_LATE' if late else 'CANCELLED'
         slot.cancelled_at = timezone.now()
-        slot.save(update_fields=['status', 'cancelled_at', 'updated_at'])
-        if late:
+        slot.cancel_reason = reason
+        fields = ['status', 'cancelled_at', 'cancel_reason', 'updated_at']
+        if late and policy.charges_fee:
+            slot.cancellation_fee = policy.late_fee
+            fields.append('cancellation_fee')
+        slot.save(update_fields=fields)
+        if late and policy.debits_hour:
             slot.debit_hours()
         who = slot.student.user.get_full_name() if slot.student else 'Créneau'
+        consequence = ''
+        if late:
+            bits = []
+            if policy.debits_hour:
+                bits.append('heure débitée')
+            if policy.charges_fee:
+                bits.append(f'frais {policy.late_fee:.2f} €')
+            consequence = f" hors délai ({', '.join(bits) or 'sans pénalité'})"
         log_activity('LATE_CANCELLATION' if late else 'CANCELLATION',
-                     f"{who} — leçon du {slot.date:%d/%m} {slot.start_time:%H:%M} annulée{' hors délai (heure débitée)' if late else ''} par {request.user.get_full_name()}",
+                     f"{who} — leçon du {slot.date:%d/%m} {slot.start_time:%H:%M} annulée{consequence} par {request.user.get_full_name()}{' : ' + reason if reason else ''}",
                      actor=request.user, student=slot.student, instructor=slot.instructor, slot=slot)
         return Response(SlotSerializer(slot).data)
 
@@ -317,6 +336,8 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
         slot = self.get_object()
         if slot.status != 'BOOKED':
             return Response({'detail': 'Ce créneau ne peut pas être marqué absent.'}, status=400)
+        if not slot.is_past:
+            return Response({'detail': "Cette leçon n'a pas encore commencé."}, status=400)
         if not hasattr(slot, 'lesson'):
             Lesson.objects.create(slot=slot, student=slot.student, attended=False,
                                   instructor_notes=request.data.get('note', ''))
@@ -337,6 +358,27 @@ class SlotViewSet(viewsets.ReadOnlyModelViewSet):
         log_activity('REFUND', f"{slot.student.user.get_full_name()} — heure du {slot.date:%d/%m} re-créditée ({note})",
                      actor=request.user, student=slot.student, instructor=slot.instructor, slot=slot)
         return Response(SlotSerializer(slot).data)
+
+
+class CancellationPolicyView(APIView):
+    """Règles d'annulation : lisibles par tout utilisateur connecté (affichées à l'élève), modifiables par le back-office."""
+
+    def get_permissions(self):
+        return [IsSupervisorOrAdmin()] if self.request.method in ('PUT', 'PATCH') else [permissions.IsAuthenticated()]
+
+    def get(self, request):
+        return Response(CancellationPolicySerializer(CancellationPolicy.current()).data)
+
+    def put(self, request):
+        policy = CancellationPolicy.current()
+        s = CancellationPolicySerializer(policy, data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        policy = s.save(updated_by=request.user)
+        log_activity('TEAM', f"Règles d'annulation modifiées : préavis {policy.notice_hours} h, {policy.get_late_penalty_display().lower()}"
+                     f"{f' ({policy.late_fee} €)' if policy.charges_fee else ''}", actor=request.user)
+        return Response(CancellationPolicySerializer(policy).data)
+
+    patch = put
 
 
 # ---------- Pédagogie ----------

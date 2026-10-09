@@ -113,7 +113,7 @@ class BookingFlowTests(APITestCase):
         soon = Slot.objects.create(
             instructor=self.instructor, student=self.student, meeting_point=self.point, status='BOOKED',
             date=timezone.localdate() + timedelta(days=1), start_time=time(9), end_time=time(10))
-        r = self.client.post(f'/api/slots/{soon.id}/cancel/')
+        r = self.client.post(f'/api/slots/{soon.id}/cancel/', {'reason': 'Imprévu'}, format='json')
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data['status'], 'CANCELLED_LATE')
         self.student.refresh_from_db()
@@ -122,7 +122,7 @@ class BookingFlowTests(APITestCase):
         later = Slot.objects.create(
             instructor=self.instructor, student=self.student, meeting_point=self.point, status='BOOKED',
             date=timezone.localdate() + timedelta(days=5), start_time=time(9), end_time=time(10))
-        r = self.client.post(f'/api/slots/{later.id}/cancel/')
+        r = self.client.post(f'/api/slots/{later.id}/cancel/', {'reason': 'Imprévu'}, format='json')
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data['status'], 'CANCELLED')
 

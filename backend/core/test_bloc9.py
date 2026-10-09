@@ -230,7 +230,7 @@ class InstructorSpaceTests(APITestCase):
         self.assertEqual(after['reserved_hours'], 1)
         self.assertEqual(after['remaining_hours'], 10)
         # annulation dans les règles → heure réinjectée
-        self.client.post(f"/api/slots/{r.data['id']}/cancel/")
+        self.client.post(f"/api/slots/{r.data['id']}/cancel/", {'reason': 'Imprévu'}, format='json')
         self.assertEqual(self.client.get('/api/student-profiles/my_profile/').data['bookable_hours'], 10)
 
     def test_instructor_student_sheet_and_contact(self):

@@ -11,6 +11,7 @@ export default function AvailabilityPage() {
   const [absences, setAbsences] = useState<Unavailability[]>([]);
   const [slot, setSlot] = useState<{ weekday: number; start_time: string; end_time: string; meeting_point: string }>({ weekday: 0, start_time: '09:00', end_time: '12:00', meeting_point: '' });
   const [points, setPoints] = useState<MeetingPoint[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [absence, setAbsence] = useState({ start: '', end: '', reason: '' });
   const [error, setError] = useState('');
 
@@ -20,14 +21,26 @@ export default function AvailabilityPage() {
     setAbsences(u.data);
     setPoints(m.data);
   }, []);
+  // Les points sont aussi gérés plus bas : on recharge la liste du menu dès qu'ils changent
+  const reloadPoints = useCallback(() => api.get('/meeting-points/').then((r) => { setPoints(r.data); return load(); }), [load]);
 
   useEffect(() => { if (ready) load(); }, [ready, load]);
 
   const addAvail = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
-    try { await api.post('/availabilities/', { ...slot, meeting_point: slot.meeting_point ? Number(slot.meeting_point) : null }); await load(); }
-    catch (err) { setError(apiError(err, 'Impossible d’ajouter ce créneau.')); }
+    const body = { ...slot, meeting_point: slot.meeting_point ? Number(slot.meeting_point) : null };
+    try {
+      if (editingId) await api.patch(`/availabilities/${editingId}/`, body); else await api.post('/availabilities/', body);
+      setEditingId(null);
+      await load();
+    }
+    catch (err) { setError(apiError(err, editingId ? 'Impossible de modifier ce créneau.' : 'Impossible d’ajouter ce créneau.')); }
   };
+  const startEdit = (a: Availability) => {
+    setEditingId(a.id); setError('');
+    setSlot({ weekday: a.weekday, start_time: hm(a.start_time), end_time: hm(a.end_time), meeting_point: a.meeting_point ? String(a.meeting_point) : '' });
+  };
+  const cancelEdit = () => { setEditingId(null); setSlot({ weekday: 0, start_time: '09:00', end_time: '12:00', meeting_point: '' }); };
   const addAbsence = async (e: React.FormEvent) => {
     e.preventDefault(); setError('');
     try { await api.post('/unavailabilities/', absence); setAbsence({ start: '', end: '', reason: '' }); await load(); }
@@ -57,16 +70,21 @@ export default function AvailabilityPage() {
               <option value="">Lieu de prise en charge : à convenir</option>
               {points.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.address}</option>)}
             </select>
-            <button type="submit" className="btn-primary col-span-3 sm:col-span-1">Ajouter</button>
+            <div className="col-span-3 sm:col-span-1 flex gap-2">
+              <button type="submit" className="btn-primary flex-1">{editingId ? 'Enregistrer' : 'Ajouter'}</button>
+              {editingId && <button type="button" onClick={cancelEdit} className="btn-secondary">Annuler</button>}
+            </div>
           </form>
+          {editingId && <p className="text-xs text-brown-800/60 -mt-2 mb-3">Modification d'un créneau enregistré — les leçons déjà réservées ne changent pas de lieu.</p>}
           <ul className="divide-y divide-cream-200">
             {byDay.map(({ name, items }) => (
               <li key={name} className="py-2 flex items-start gap-3">
                 <span className="w-24 shrink-0 font-medium">{name}</span>
                 <div className="flex flex-wrap gap-2 flex-1">
                   {items.length === 0 ? <span className="text-brown-800/40 text-sm">—</span> : items.map((a) => (
-                    <span key={a.id} className="badge bg-cream-200 text-brown-800 inline-flex items-center gap-2" title={a.meeting_point_name ? `Lieu : ${a.meeting_point_name}` : 'Lieu à convenir'}>
+                    <span key={a.id} className={`badge text-brown-800 inline-flex items-center gap-2 ${editingId === a.id ? 'bg-caramel/40 ring-1 ring-brown-700' : 'bg-cream-200'}`} title={a.meeting_point_name ? `Lieu : ${a.meeting_point_name}` : 'Lieu à convenir'}>
                       {hm(a.start_time)}–{hm(a.end_time)}{a.meeting_point_name && <span className="text-brown-800/60">· {a.meeting_point_name}</span>}
+                      <button onClick={() => startEdit(a)} aria-label="Modifier" className="text-brown-700 hover:underline text-xs">Modifier</button>
                       <button onClick={() => remove(`/availabilities/${a.id}/`)} aria-label="Supprimer" className="text-brown-800/50 hover:text-red-600">×</button>
                     </span>
                   ))}
@@ -110,7 +128,7 @@ export default function AvailabilityPage() {
       <section className="card mt-6">
         <h2 className="text-xl mb-1">Points de rendez-vous</h2>
         <p className="text-xs text-brown-800/60 mb-3">Lieux proposés aux élèves quand ils réservent une leçon.</p>
-        {ready && <MeetingPointsManager />}
+        {ready && <MeetingPointsManager onChange={reloadPoints} />}
       </section>
     </AppShell>
   );

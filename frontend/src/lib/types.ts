@@ -24,6 +24,19 @@ export interface Slot {
   hours_debited: boolean;
   hours_refunded: boolean;
   refund_note: string;
+  cancel_reason: string;
+  cancellation_fee: string;
+  can_assess: boolean;
+  assessment_opens_at: string;
+  free_cancel_until: string | null;
+}
+
+export interface CancellationPolicy {
+  notice_hours: number;
+  late_penalty: 'DEBIT_HOUR' | 'FEE' | 'DEBIT_AND_FEE' | 'NONE';
+  penalty_display: string;
+  late_fee: string;
+  late_description: string;
 }
 
 export interface FreeWindow {

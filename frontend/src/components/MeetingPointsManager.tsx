@@ -5,7 +5,7 @@ import { MeetingPoint, apiError } from '@/lib/types';
 type Point = MeetingPoint & { description?: string };
 
 /** Gestion des points de rendez-vous (lieux où commencent les leçons). Accessible aux moniteurs et à l'équipe admin. */
-export default function MeetingPointsManager({ compact = false }: { compact?: boolean }) {
+export default function MeetingPointsManager({ compact = false, onChange }: { compact?: boolean; onChange?: () => void }) {
   const [points, setPoints] = useState<Point[] | null>(null);
   const [form, setForm] = useState({ name: '', address: '', description: '' });
   const [editing, setEditing] = useState<number | null>(null);
@@ -13,19 +13,20 @@ export default function MeetingPointsManager({ compact = false }: { compact?: bo
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => api.get('/meeting-points/').then((r) => setPoints(r.data)), []);
   useEffect(() => { load(); }, [load]);
+  const reload = async () => { await load(); onChange?.(); };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setMsg(null);
     try {
       editing ? await api.patch(`/meeting-points/${editing}/`, form) : await api.post('/meeting-points/', form);
-      setForm({ name: '', address: '', description: '' }); setEditing(null); await load();
+      setForm({ name: '', address: '', description: '' }); setEditing(null); await reload();
       setMsg({ ok: true, text: editing ? 'Point de rendez-vous modifié.' : 'Point de rendez-vous ajouté : les élèves peuvent le choisir à la réservation.' });
     } catch (err) { setMsg({ ok: false, text: apiError(err, 'Enregistrement impossible.') }); }
     finally { setBusy(false); }
   };
   const remove = async (p: Point) => {
     if (!confirm(`Supprimer « ${p.name} » ? Les leçons déjà réservées à cet endroit passent en « lieu à convenir ».`)) return;
-    try { await api.delete(`/meeting-points/${p.id}/`); await load(); setMsg({ ok: true, text: 'Point supprimé.' }); }
+    try { await api.delete(`/meeting-points/${p.id}/`); await reload(); setMsg({ ok: true, text: 'Point supprimé.' }); }
     catch (err) { setMsg({ ok: false, text: apiError(err, 'Suppression impossible.') }); }
   };
 

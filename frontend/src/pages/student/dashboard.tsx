@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
 import ProgressGauge from '@/components/ProgressGauge';
+import CancelLessonDialog from '@/components/CancelLessonDialog';
 import { Lesson, Slot, StudentProfile, frDate, hm } from '@/lib/types';
 import { ExamStats } from '@/lib/lms';
 import { ReadinessGauge } from '@/components/LmsAnalytics';
@@ -24,11 +25,12 @@ export default function StudentDashboard() {
   const [stats, setStats] = useState<ExamStats | null>(null);
   const [upcoming, setUpcoming] = useState<Slot[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [toCancel, setToCancel] = useState<Slot | null>(null);
+  const [notice, setNotice] = useState('');
   const { user } = useAuth();
   const ready = useRequireAuth('STUDENT');
 
-  useEffect(() => {
-    if (!ready) return;
+  const load = useCallback(() =>
     Promise.all([api.get('/student-profiles/my_profile/'), api.get('/lessons/to_rate/'), api.get('/slots/'), api.get('/lessons/')])
       .then(([p, t, s, l]) => {
         setProfile(p.data); setToRate(t.data);
@@ -38,8 +40,8 @@ export default function StudentDashboard() {
         if (p.data.has_lms_access) api.get('/lms/exam-attempts/stats/').then((r) => setStats(r.data)).catch(() => {});
       })
       .catch((e) => console.error(e))
-      .finally(() => setIsLoading(false));
-  }, [ready]);
+      .finally(() => setIsLoading(false)), []);
+  useEffect(() => { if (ready) load(); }, [ready, load]);
 
   if (isLoading) return <AppShell title="Mon espace"><p className="text-brown-500">Chargement…</p></AppShell>;
   if (!profile) return <AppShell title="Mon espace"><p className="text-brown-500">Profil introuvable</p></AppShell>;
@@ -48,6 +50,8 @@ export default function StudentDashboard() {
 
   return (
     <AppShell title="Mon espace">
+      {notice && <div className="rounded-xl border border-brown-300 bg-brown-50 px-4 py-3 mb-6 text-sm">{notice}</div>}
+      {toCancel && <CancelLessonDialog slot={toCancel} onClose={() => setToCancel(null)} onDone={(text) => { setToCancel(null); setNotice(text); load(); }} />}
         <h1 className="text-3xl mb-6">Bonjour, {user?.first_name} 👋</h1>
 
         {!profile.dossier.complete && (
@@ -119,7 +123,10 @@ export default function StudentDashboard() {
               <ul className="divide-y divide-cream-200 text-sm">{upcoming.slice(0, 6).map((s) => (
                 <li key={s.id} className="py-2">
                   <div className="font-semibold">{frDate(s.date, { weekday: 'long', day: 'numeric', month: 'long' })} · {hm(s.start_time)}–{hm(s.end_time)}</div>
-                  <div className="text-brown-800/70">{s.instructor_name} · {s.meeting_point_name}</div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-brown-800/70">{s.instructor_name} · {s.meeting_point_name}</span>
+                    {!s.is_past && <button onClick={() => setToCancel(s)} className="text-xs text-brown-700 hover:underline">Annuler</button>}
+                  </div>
                 </li>
               ))}</ul>
             )}

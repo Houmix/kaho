@@ -230,6 +230,8 @@ class Slot(models.Model):
     student = models.ForeignKey(StudentProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name='booked_slots')
     instructor = models.ForeignKey(User, on_delete=models.PROTECT, related_name='slots', limit_choices_to={'role': 'INSTRUCTOR'})
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancel_reason = models.TextField("Motif d'annulation", blank=True)
+    cancellation_fee = models.DecimalField("Frais d'annulation appliqués (€)", max_digits=7, decimal_places=2, default=0)
     hours_debited = models.BooleanField("Heures débitées", default=False)
     hours_refunded = models.BooleanField("Heures re-créditées (dérogation)", default=False)
     refund_note = models.TextField("Justificatif de dérogation", blank=True)
@@ -261,8 +263,25 @@ class Slot(models.Model):
         return timezone.make_aware(datetime.combine(self.date, self.start_time))
 
     @property
+    def ends_at(self):
+        from datetime import datetime
+        return timezone.make_aware(datetime.combine(self.date, self.end_time))
+
+    @property
     def is_past(self):
         return self.starts_at <= timezone.now()
+
+    ASSESSMENT_OPENS_BEFORE_END_MINUTES = 10
+
+    @property
+    def assessment_opens_at(self):
+        """Le bilan n'est saisissable que dans les 10 dernières minutes de la leçon, puis après sa fin."""
+        from datetime import timedelta
+        return self.ends_at - timedelta(minutes=self.ASSESSMENT_OPENS_BEFORE_END_MINUTES)
+
+    @property
+    def can_assess(self):
+        return timezone.now() >= self.assessment_opens_at
 
     def debit_hours(self):
         """Débite l'heure du solde de l'élève, une seule fois."""
@@ -274,15 +293,66 @@ class Slot(models.Model):
         self.save(update_fields=['hours_debited', 'updated_at'])
 
     def refund_hours(self, note=''):
-        """Dérogation : re-crédite l'heure débitée (certificat médical…)."""
-        if not self.hours_debited or self.hours_refunded or not self.student:
+        """Dérogation : re-crédite l'heure débitée et/ou lève les frais d'annulation (certificat médical…)."""
+        has_fee = self.cancellation_fee > 0
+        has_debit = self.hours_debited and not self.hours_refunded
+        if not self.student or not (has_debit or has_fee):
             return False
-        self.student.used_hours = max(0.0, self.student.used_hours - self.duration_hours)
-        self.student.save(update_fields=['used_hours'])
-        self.hours_refunded = True
+        if has_debit:
+            self.student.used_hours = max(0.0, self.student.used_hours - self.duration_hours)
+            self.student.save(update_fields=['used_hours'])
+            self.hours_refunded = True
+        if has_fee:
+            note = f"{note} (frais de {self.cancellation_fee} € levés)".strip()
+            self.cancellation_fee = 0
         self.refund_note = note
-        self.save(update_fields=['hours_refunded', 'refund_note', 'updated_at'])
+        self.save(update_fields=['hours_refunded', 'cancellation_fee', 'refund_note', 'updated_at'])
         return True
+
+
+class CancellationPolicy(models.Model):
+    """Règles d'annulation par l'élève (une seule ligne, éditée par l'équipe admin)."""
+    PENALTY_CHOICES = [
+        ('DEBIT_HOUR', "L'heure est décomptée du solde"),
+        ('FEE', "Frais d'annulation (l'heure est restituée)"),
+        ('DEBIT_AND_FEE', "Heure décomptée + frais d'annulation"),
+        ('NONE', "Aucune pénalité"),
+    ]
+    notice_hours = models.PositiveIntegerField("Préavis d'annulation gratuite (heures avant la leçon)", default=48)
+    late_penalty = models.CharField("Pénalité en cas d'annulation tardive", max_length=15, choices=PENALTY_CHOICES, default='DEBIT_HOUR')
+    late_fee = models.DecimalField("Frais d'annulation tardive (€)", max_digits=7, decimal_places=2, default=0, validators=[MinValueValidator(0)])
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+
+    class Meta:
+        verbose_name = "Règles d'annulation"
+
+    def __str__(self):
+        return f"Préavis {self.notice_hours} h — {self.get_late_penalty_display()}"
+
+    @classmethod
+    def current(cls):
+        obj = cls.objects.first()
+        if obj is None:
+            from django.conf import settings
+            obj = cls.objects.create(notice_hours=settings.BOOKING_CANCEL_DEADLINE_HOURS)
+        return obj
+
+    @property
+    def debits_hour(self):
+        return self.late_penalty in ('DEBIT_HOUR', 'DEBIT_AND_FEE')
+
+    @property
+    def charges_fee(self):
+        return self.late_penalty in ('FEE', 'DEBIT_AND_FEE') and self.late_fee > 0
+
+    def describe_late(self):
+        parts = []
+        if self.debits_hour:
+            parts.append("l'heure est décomptée de votre solde")
+        if self.charges_fee:
+            parts.append(f"{self.late_fee:.2f} € de frais d'annulation s'appliquent")
+        return ' et '.join(parts) if parts else "aucune pénalité n'est appliquée"
 
 
 class Competency(models.Model):

@@ -10,7 +10,7 @@ from core.views import InternalRemindersView, PasswordResetConfirmView, Password
 from core.viewsets import (
     UserViewSet, StudentProfileViewSet, InstructorViewSet, AvailabilityViewSet, UnavailabilityViewSet,
     MeetingPointViewSet, SlotViewSet, CompetencyViewSet, LessonViewSet, OfferViewSet, PackageViewSet,
-    InvoiceViewSet, DocumentViewSet, VehicleLogViewSet,
+    InvoiceViewSet, DocumentViewSet, VehicleLogViewSet, CancellationPolicyView,
 )
 
 router = DefaultRouter()
@@ -43,6 +43,7 @@ router.register(r'admin/offers', AdminOfferViewSet, basename='admin-offer')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('cancellation-policy/', CancellationPolicyView.as_view(), name='cancellation_policy'),
     path('lms/', include('lms.urls')),
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('admin/overview/', AdminOverviewView.as_view(), name='admin_overview'),

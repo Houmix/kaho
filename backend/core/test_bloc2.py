@@ -100,14 +100,14 @@ class NoShowPolicyTests(APITestCase):
 
     def test_cancel_before_deadline_is_free(self):
         self.auth('eleve@test.fr')
-        r = self.client.post(f'/api/slots/{self.later.id}/cancel/')
+        r = self.client.post(f'/api/slots/{self.later.id}/cancel/', {'reason': 'Imprévu'}, format='json')
         self.assertEqual(r.data['status'], 'CANCELLED')
         self.student.refresh_from_db()
         self.assertEqual(self.student.used_hours, 0)
 
     def test_cancel_after_deadline_debits_hour_and_supervisor_can_refund(self):
         self.auth('eleve@test.fr')
-        r = self.client.post(f'/api/slots/{self.soon.id}/cancel/')
+        r = self.client.post(f'/api/slots/{self.soon.id}/cancel/', {'reason': 'Imprévu'}, format='json')
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(r.data['status'], 'CANCELLED_LATE')
         self.assertTrue(r.data['hours_debited'])
@@ -130,12 +130,15 @@ class NoShowPolicyTests(APITestCase):
 
     def test_no_show_marks_slot_and_debits(self):
         self.auth('m@kaho.app')
-        r = self.client.post(f'/api/slots/{self.later.id}/no_show/', {'note': 'Pas venu'})
+        # Impossible de déclarer une absence avant le début de la leçon
+        self.assertEqual(self.client.post(f'/api/slots/{self.later.id}/no_show/', {'note': 'Pas venu'}).status_code, 400)
+        past = self._slot(days=-1)
+        r = self.client.post(f'/api/slots/{past.id}/no_show/', {'note': 'Pas venu'})
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(r.data['status'], 'NO_SHOW')
         self.student.refresh_from_db()
         self.assertEqual(self.student.used_hours, 1)
-        self.assertFalse(self.later.lesson.attended)
+        self.assertFalse(past.lesson.attended)
 
 
 @override_settings(CELERY_TASK_ALWAYS_EAGER=True)

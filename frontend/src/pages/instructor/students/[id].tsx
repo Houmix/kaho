@@ -5,6 +5,7 @@ import api from '@/lib/api';
 import { STAFF_ROLES, useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
 import ProgressGauge from '@/components/ProgressGauge';
+import BackLink from '@/components/BackLink';
 import { Logbook, STATUS_LABELS, Slot, apiError, frDate, hm } from '@/lib/types';
 
 export default function InstructorStudentSheet() {
@@ -38,7 +39,7 @@ export default function InstructorStudentSheet() {
 
   return (
     <AppShell title={`${s.user.first_name} ${s.user.last_name}`}>
-      <Link href="/instructor/dashboard" className="text-sm text-brown-700 hover:underline">← Mes élèves</Link>
+      <BackLink fallbackHref="/instructor/dashboard" fallbackLabel="← Mes élèves" />
       <div className="flex flex-wrap items-start justify-between gap-3 mt-2 mb-4">
         <div>
           <h1 className="text-3xl">{s.user.first_name} {s.user.last_name}</h1>

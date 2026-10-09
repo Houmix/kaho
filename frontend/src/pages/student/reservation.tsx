@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import AppShell from '@/components/AppShell';
+import CancelLessonDialog from '@/components/CancelLessonDialog';
 import { FreeWindow, MeetingPoint, Slot, StudentProfile, apiError, frDate, hm } from '@/lib/types';
 
 function isoDaysFromNow(n: number) {
@@ -21,6 +22,8 @@ export default function Reservation() {
   const [mine, setMine] = useState<Slot[]>([]);
   const [selected, setSelected] = useState<FreeWindow | null>(null);
   const [busy, setBusy] = useState(false);
+  const [toCancel, setToCancel] = useState<Slot | null>(null);
+  const [policyHours, setPolicyHours] = useState(48);
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
 
   const refresh = useCallback(async () => {
@@ -36,6 +39,7 @@ export default function Reservation() {
       setPoints(r.data);
       if (r.data.length) setPointId(r.data[0].id);
     });
+    api.get('/cancellation-policy/').then((r) => setPolicyHours(r.data.notice_hours)).catch(() => {});
     refresh();
   }, [ready, refresh]);
 
@@ -64,18 +68,6 @@ export default function Reservation() {
     } catch (err) {
       setMessage({ kind: 'err', text: apiError(err, 'Réservation impossible.') });
     } finally { setBusy(false); }
-  };
-
-  const cancel = async (slot: Slot) => {
-    if (!confirm(`Annuler la leçon du ${frDate(slot.date)} à ${hm(slot.start_time)} ?`)) return;
-    setMessage(null);
-    try {
-      await api.post(`/slots/${slot.id}/cancel/`);
-      setMessage({ kind: 'ok', text: 'Leçon annulée.' });
-      await refresh();
-    } catch (err) {
-      setMessage({ kind: 'err', text: apiError(err, 'Annulation impossible.') });
-    }
   };
 
   const days = Array.from({ length: 14 }, (_, i) => isoDaysFromNow(i + 1));
@@ -160,12 +152,13 @@ export default function Reservation() {
                 <div className="font-semibold">{frDate(s.date)} · {hm(s.start_time)} – {hm(s.end_time)}</div>
                 <div className="text-sm text-brown-800/70">{s.instructor_name} · {s.meeting_point_name}</div>
               </div>
-              <button onClick={() => cancel(s)} className="btn-outline !py-1.5 text-sm">Annuler</button>
+              {!s.is_past && <button onClick={() => setToCancel(s)} className="btn-outline !py-1.5 text-sm">Annuler</button>}
             </li>
           ))}
         </ul>
       )}
-      <p className="text-xs text-brown-800/50 mt-3">Annulation gratuite jusqu'à 48 h avant la leçon.</p>
+      <p className="text-xs text-brown-800/50 mt-3">Annulation gratuite jusqu'à {policyHours} h avant la leçon ; au-delà, la règle de l'école s'applique. Le motif de l'annulation est obligatoire.</p>
+      {toCancel && <CancelLessonDialog slot={toCancel} onClose={() => setToCancel(null)} onDone={(text) => { setToCancel(null); setMessage({ kind: 'ok', text }); refresh(); }} />}
     </AppShell>
   );
 }
