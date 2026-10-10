@@ -125,7 +125,7 @@ export default function AdminInstructors() {
       </div>
       {msg && <div className={`rounded-xl px-4 py-3 mb-4 text-sm ${msg.ok ? 'border border-brown-300 bg-brown-50' : 'border border-red-200 bg-red-50 text-red-700'}`}>{msg.text}</div>}
 
-      <div className="flex gap-1 mb-6">
+      <div className="flex flex-wrap gap-1 mb-6">
         <button onClick={() => setTab('list')} className={`badge !px-4 !py-2 ${tab === 'list' ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>Moniteurs {list ? `(${list.count})` : ''}</button>
         <button onClick={() => setTab('applications')} className={`badge !px-4 !py-2 ${tab === 'applications' ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>Candidatures {pendingCount ? `(${pendingCount})` : ''}</button>
         <button onClick={() => setTab('absences')} className={`badge !px-4 !py-2 ${tab === 'absences' ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>Absences à valider {absences?.count ? `(${absences.count})` : ''}</button>
@@ -183,7 +183,7 @@ export default function AdminInstructors() {
 
       {tab === 'applications' && (
         <>
-          <div className="flex gap-1 mb-4">
+          <div className="flex flex-wrap gap-1 mb-4">
             {[['PENDING', 'À examiner'], ['APPROVED', 'Acceptées'], ['REJECTED', 'Refusées'], ['', 'Toutes']].map(([k, l]) => (
               <button key={k} onClick={() => setAppStatus(k)} className={`badge !px-3 !py-1.5 ${appStatus === k ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>{l}</button>
             ))}

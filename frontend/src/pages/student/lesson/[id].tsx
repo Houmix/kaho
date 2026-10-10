@@ -35,8 +35,8 @@ export default function StudentLessonDetail() {
           <h2 className="text-xl mb-2">Compétences travaillées</h2>
           {l.assessments.length === 0 ? <p className="text-sm text-brown-800/60">Aucune compétence cochée pour cette séance.</p> : (
             <>
-              {acquired.length > 0 && <><p className="text-sm font-medium mt-1 mb-1">Validées</p><ul className="flex flex-wrap gap-1 mb-3">{acquired.map((a) => <li key={a.competency} className="badge bg-brown-700 text-cream-50" title={a.label}>{a.code} {a.label}</li>)}</ul></>}
-              {inProgress.length > 0 && <><p className="text-sm font-medium mb-1">En cours d'acquisition</p><ul className="flex flex-wrap gap-1">{inProgress.map((a) => <li key={a.competency} className="badge bg-caramel/40 text-brown-900" title={STATUS_LABELS[a.status]}>{a.code} {a.label}</li>)}</ul></>}
+              {acquired.length > 0 && <><p className="text-sm font-medium mt-1 mb-1">Validées</p><ul className="flex flex-wrap gap-1 mb-3">{acquired.map((a) => <li key={a.competency} className="badge bg-brown-700 text-cream-50" title={a.label}>{a.code} {a.label.split(' (')[0]}</li>)}</ul></>}
+              {inProgress.length > 0 && <><p className="text-sm font-medium mb-1">En cours d'acquisition</p><ul className="flex flex-wrap gap-1">{inProgress.map((a) => <li key={a.competency} className="badge bg-caramel/40 text-brown-900" title={STATUS_LABELS[a.status]}>{a.code} {a.label.split(' (')[0]}</li>)}</ul></>}
             </>
           )}
         </section>

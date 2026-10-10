@@ -70,7 +70,7 @@ export default function OfferFinder({ ctaHref }: { ctaHref: (offer: Offer) => st
   const s = STEPS[step];
   return (
     <div className="max-w-xl mx-auto">
-      <div className="flex gap-1 mb-6">
+      <div className="flex flex-wrap gap-1 mb-6">
         {STEPS.map((_, i) => <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? 'bg-brown-700' : 'bg-cream-300'}`} />)}
       </div>
       <h3 className="text-2xl text-center mb-6">{s.question}</h3>

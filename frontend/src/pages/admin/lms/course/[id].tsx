@@ -92,15 +92,15 @@ export default function AdminCourseEditor() {
               </div>
               <ul className="text-sm divide-y divide-cream-200">
                 {s.lessons.map((l, li) => (
-                  <li key={l.id} className={`py-1.5 flex items-center gap-2 cursor-grab ${over === `lesson-${l.id}` ? 'bg-cream-100' : ''}`} {...dnd('lesson', s.lessons, li, '/lms/admin/lessons/reorder/', s.id)}>
-                    <div className="flex gap-1"><button onClick={() => move(s.lessons, li, -1, '/lms/admin/lessons/reorder/')} disabled={li === 0} className="text-[10px] text-brown-800/50 disabled:opacity-30">▲</button><button onClick={() => move(s.lessons, li, 1, '/lms/admin/lessons/reorder/')} disabled={li === s.lessons.length - 1} className="text-[10px] text-brown-800/50 disabled:opacity-30">▼</button></div>
+                  <li key={l.id} className={`py-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 cursor-grab ${over === `lesson-${l.id}` ? 'bg-cream-100' : ''}`} {...dnd('lesson', s.lessons, li, '/lms/admin/lessons/reorder/', s.id)}>
+                    <div className="flex flex-wrap gap-1"><button onClick={() => move(s.lessons, li, -1, '/lms/admin/lessons/reorder/')} disabled={li === 0} className="text-[10px] text-brown-800/50 disabled:opacity-30">▲</button><button onClick={() => move(s.lessons, li, 1, '/lms/admin/lessons/reorder/')} disabled={li === s.lessons.length - 1} className="text-[10px] text-brown-800/50 disabled:opacity-30">▼</button></div>
                     <Link href={`/admin/lms/lesson/${l.id}`} className={`font-medium text-brown-700 hover:underline ${!l.is_published ? 'opacity-60' : ''}`}>{l.title}</Link>
                     {l.has_video && <span className="text-xs text-brown-800/50">▶ vidéo</span>}<span className="text-xs text-brown-800/50">{l.minutes} min</span>
                     <span className="ml-auto text-xs text-brown-800/60">{l.completions} terminée(s)</span>
                     <label className="text-xs flex items-center gap-1"><input type="checkbox" checked={l.is_published} onChange={(e) => act(() => api.patch(`/lms/admin/lessons/${l.id}/`, { is_published: e.target.checked }), 'Leçon mise à jour.')} className="accent-brown-700" /> publiée</label>
                   </li>
                 ))}
-                <li className="py-1.5 flex items-center gap-2">
+                <li className="py-1.5 flex flex-wrap items-center gap-2">
                   <form onSubmit={(e) => { e.preventDefault(); act(() => api.post('/lms/admin/lessons/', { section: s.id, title: newLesson[s.id], order: s.lessons.length + 1, is_published: false }), 'Leçon créée (brouillon).').then(() => setNewLesson({ ...newLesson, [s.id]: '' })); }} className="flex gap-2 flex-1"><input required placeholder="Titre de la nouvelle leçon" value={newLesson[s.id] || ''} onChange={(e) => setNewLesson({ ...newLesson, [s.id]: e.target.value })} className="input-field !py-1 text-xs flex-1" /><button className="btn-secondary !py-1 text-xs">+ Leçon</button></form>
                   {s.quiz ? <Link href={`/admin/lms/quiz/${s.quiz.id}`} className="text-xs text-brown-700 font-medium hover:underline whitespace-nowrap">★ {s.quiz.title} ({s.quiz.questions} q.{s.quiz.attempts ? ` · ${s.quiz.pass_rate} % réussite` : ''})</Link>
                     : <button onClick={() => act(() => api.post(`/lms/admin/sections/${s.id}/add_quiz/`), 'Quiz créé.')} className="text-xs text-brown-700 hover:underline whitespace-nowrap">+ Quiz de fin de section</button>}

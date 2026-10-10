@@ -85,7 +85,7 @@ export default function StudentDocuments() {
             <p className="font-semibold">{dossier.complete ? 'Dossier complet ✓' : 'Dossier incomplet'}</p>
             <p className="text-sm text-brown-800/70">{dossier.complete ? 'Toutes vos pièces sont validées.' : `${dossier.missing} à fournir · ${dossier.pending} en attente de validation`}</p>
           </div>
-          <div className="flex gap-1">{required.map((i) => <span key={i.type} className={`w-3 h-3 rounded-full ${i.status === 'VERIFIED' ? 'bg-brown-700' : i.status === 'PENDING' ? 'bg-caramel' : 'bg-cream-300'}`} title={i.label} />)}</div>
+          <div className="flex flex-wrap gap-1">{required.map((i) => <span key={i.type} className={`w-3 h-3 rounded-full ${i.status === 'VERIFIED' ? 'bg-brown-700' : i.status === 'PENDING' ? 'bg-caramel' : 'bg-cream-300'}`} title={i.label} />)}</div>
         </div>
       </div>
 

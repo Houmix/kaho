@@ -13,9 +13,20 @@
     overflow-x: hidden;
   }
   /* Éléments de grille / flex : peuvent rétrécir sous leur contenu (sinon un long texte élargit toute la page) */
-  main, main > *, .card { min-width: 0; }
+  main, main > *, .card, .grid > * { min-width: 0; }
   img, video, iframe, svg { max-width: 100%; }
   input[type="file"] { max-width: 100%; }
+  /* Écrans tactiles : zones de toucher confortables pour les petits liens / boutons texte (▲▼, Modifier, Supprimer…) */
+  @media (pointer: coarse) {
+    main button:not(.btn):not([class*="btn-"]):not(.badge):not([role="switch"]),
+    main a.hover\:underline { padding-block: 0.5rem; padding-inline: 0.25rem; }
+    main button.badge { min-height: 2.25rem; }
+  }
+  /* Téléphone : les colonnes gardent leur largeur naturelle (le tableau défile dans sa carte) au lieu de s'écraser */
+  @media (max-width: 639px) {
+    main table th, main table td { white-space: nowrap; }
+    main table td.wrap, main table td .wrap { white-space: normal; min-width: 12rem; }
+  }
   /* iOS zoome sur les champs < 16 px : on évite le zoom automatique au focus */
   @media (max-width: 639px) {
     input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
@@ -32,6 +43,7 @@
   .btn {
     @apply inline-flex items-center justify-center px-5 py-2.5 rounded-full font-medium text-center transition-colors sm:whitespace-nowrap max-w-full;
   }
+  button.badge, td .badge, th .badge { @apply whitespace-nowrap; }
   .btn-primary {
     @apply btn bg-brown-700 text-cream-50 hover:bg-brown-800;
   }
@@ -51,7 +63,7 @@
     @apply w-full px-4 py-2.5 bg-white border border-cream-300 rounded-xl text-brown-900 placeholder:text-brown-300 focus:outline-none focus:ring-2 focus:ring-brown-500 focus:border-brown-500;
   }
   .badge {
-    @apply inline-block px-2.5 py-1 rounded-full text-xs font-medium;
+    @apply inline-block px-2.5 py-1 rounded-[14px] text-xs font-medium leading-snug;
   }
 
   /* Rendu Markdown des leçons et questions */

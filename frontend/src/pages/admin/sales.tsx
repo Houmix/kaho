@@ -64,7 +64,7 @@ export default function AdminSales() {
     <AdminShell title="Ventes & factures" wide>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h1 className="text-3xl">Ventes & factures</h1>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {([['overview', 'Chiffre d’affaires'], ['invoices', 'Factures'], ['payroll', 'Paie des moniteurs']] as [Tab, string][]).map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className={`badge !px-4 !py-2 ${tab === k ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>{l}</button>
           ))}
@@ -103,7 +103,7 @@ export default function AdminSales() {
           <div className="flex flex-wrap gap-2 items-center mb-4">
             <input value={filter.q} onChange={(e) => setFilter({ ...filter, q: e.target.value })} placeholder="N°, nom, email…" className="input-field sm:w-64 !py-2" />
             <input type="month" value={filter.month} onChange={(e) => setFilter({ ...filter, month: e.target.value })} className="input-field sm:w-44 !py-2" />
-            <div className="flex gap-1">{[['', 'Toutes'], ['ISSUED', 'À régler'], ['PAID', 'Payées'], ['CANCELLED', 'Annulées']].map(([k, l]) => <button key={k} onClick={() => setFilter({ ...filter, status: k })} className={`badge !px-3 !py-1.5 ${filter.status === k ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>{l}</button>)}</div>
+            <div className="flex flex-wrap gap-1">{[['', 'Toutes'], ['ISSUED', 'À régler'], ['PAID', 'Payées'], ['CANCELLED', 'Annulées']].map(([k, l]) => <button key={k} onClick={() => setFilter({ ...filter, status: k })} className={`badge !px-3 !py-1.5 ${filter.status === k ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>{l}</button>)}</div>
             <button onClick={csvInvoices} className="btn-secondary !py-2 ml-auto" disabled={!invoices?.results.length}>Exporter CSV</button>
           </div>
           {!invoices ? <p className="text-brown-500">Chargement…</p> : <InvoiceTable items={invoices.results} />}

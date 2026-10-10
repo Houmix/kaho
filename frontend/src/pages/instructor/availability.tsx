@@ -80,10 +80,10 @@ export default function AvailabilityPage() {
             {byDay.map(({ name, items }) => (
               <li key={name} className="py-2 flex items-start gap-3">
                 <span className="w-24 shrink-0 font-medium">{name}</span>
-                <div className="flex flex-wrap gap-2 flex-1">
+                <div className="flex flex-wrap gap-2 flex-1 min-w-0">
                   {items.length === 0 ? <span className="text-brown-800/40 text-sm">—</span> : items.map((a) => (
-                    <span key={a.id} className={`badge text-brown-800 inline-flex items-center gap-2 ${editingId === a.id ? 'bg-caramel/40 ring-1 ring-brown-700' : 'bg-cream-200'}`} title={a.meeting_point_name ? `Lieu : ${a.meeting_point_name}` : 'Lieu à convenir'}>
-                      {hm(a.start_time)}–{hm(a.end_time)}{a.meeting_point_name && <span className="text-brown-800/60">· {a.meeting_point_name}</span>}
+                    <span key={a.id} className={`inline-flex max-w-full items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-medium text-brown-800 ${editingId === a.id ? 'bg-caramel/40 ring-1 ring-brown-700' : 'bg-cream-200'}`} title={a.meeting_point_name ? `Lieu : ${a.meeting_point_name}` : 'Lieu à convenir'}>
+                      <span className="whitespace-nowrap">{hm(a.start_time)}–{hm(a.end_time)}</span>{a.meeting_point_name && <span className="text-brown-800/60 truncate min-w-0">· {a.meeting_point_name}</span>}
                       <button onClick={() => startEdit(a)} aria-label="Modifier" className="text-brown-700 hover:underline text-xs">Modifier</button>
                       <button onClick={() => remove(`/availabilities/${a.id}/`)} aria-label="Supprimer" className="text-brown-800/50 hover:text-red-600">×</button>
                     </span>

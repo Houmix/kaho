@@ -81,7 +81,7 @@ export default function InstructorStudentSheet() {
         </section>
       )}
 
-      <div className="flex gap-1 mb-4">
+      <div className="flex flex-wrap gap-1 mb-4">
         {([['lessons', `Historique des leçons (${lb.lessons.length})`], ['skills', 'Bilan des compétences']] as const).map(([k, l]) => <button key={k} onClick={() => setTab(k)} className={`badge !px-4 !py-2 ${tab === k ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>{l}</button>)}
       </div>
 

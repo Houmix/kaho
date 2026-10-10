@@ -23,10 +23,12 @@ export function ActivityList({ items }: { items: ActivityEntry[] }) {
   return (
     <ul className="divide-y divide-cream-200">
       {items.map((e) => (
-        <li key={e.id} className="py-2 flex gap-3 text-sm">
-          <span className="text-brown-800/50 whitespace-nowrap w-28 shrink-0">{new Date(e.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-          <span className={`badge shrink-0 ${KIND_STYLE[e.kind] || 'bg-cream-200 text-brown-800'}`}>{e.kind_display}</span>
-          <span className="flex-1">
+        <li key={e.id} className="py-3 sm:py-2 flex flex-col sm:flex-row gap-1.5 sm:gap-3 text-sm">
+          <div className="flex items-center gap-2 sm:contents">
+          <span className="text-brown-800/50 whitespace-nowrap sm:w-28 shrink-0">{new Date(e.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+          <span className={`badge shrink-0 self-start whitespace-nowrap ${KIND_STYLE[e.kind] || 'bg-cream-200 text-brown-800'}`}>{e.kind_display}</span>
+          </div>
+          <span className="flex-1 min-w-0 break-words">
             {e.message}
             {e.actor_name && <span className="text-brown-800/50"> — par {e.actor_name}</span>}
             {e.student && <> · <Link href={`/admin/students/${e.student}`} className="text-brown-700 hover:underline">élève</Link></>}

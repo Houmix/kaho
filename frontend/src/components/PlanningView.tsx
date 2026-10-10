@@ -127,7 +127,7 @@ export default function PlanningView() {
           <button onClick={() => shift(1)} className="btn-secondary !px-3 !py-1.5" aria-label="Suivant">→</button>
           <h1 className="text-xl sm:text-2xl sm:ml-2 capitalize w-full sm:w-auto order-last sm:order-none">{title}</h1>
         </div>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {(['day', 'week', 'month'] as View[]).map((v) => <button key={v} onClick={() => setView(v)} className={`badge !px-4 !py-2 ${view === v ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>{v === 'day' ? 'Jour' : v === 'week' ? 'Semaine' : 'Mois'}</button>)}
         </div>
       </div>

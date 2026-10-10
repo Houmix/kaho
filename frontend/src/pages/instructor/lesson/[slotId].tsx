@@ -130,7 +130,7 @@ export default function LessonForm() {
                     return (
                       <li key={c.id} className="py-2 grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto_auto] items-center gap-2 text-sm">
                         <span><span className="text-brown-800/50 mr-2">{c.code}</span>{c.label}</span>
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
                           {(['IN_PROGRESS', 'ACQUIRED'] as Choice[]).map((v) => (
                             <button key={v} type="button" onClick={() => toggle(c.id, v)} aria-pressed={choices[c.id] === v}
                               className={`px-3 py-1 rounded-full text-xs font-medium border ${choices[c.id] === v ? (v === 'ACQUIRED' ? 'bg-brown-700 text-cream-50 border-brown-700' : 'bg-caramel/40 text-brown-900 border-caramel') : 'bg-white border-cream-300 text-brown-800 hover:border-brown-300'}`}>
