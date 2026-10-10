@@ -165,7 +165,8 @@ class LmsTests(APITestCase):
         # Temps écoulé → copie remise automatiquement avec les réponses sauvegardées
         r = self.client.post(f'/api/lms/exams/{exam.id}/start/')
         a2_id = r.data['attempt']['id']
-        self.client.patch(f'/api/lms/exam-attempts/{a2_id}/answers/', {'answers': dict(list(good.items())[:3])}, format='json')
+        good2 = self.answers_for(Question.objects.filter(id__in=[q['id'] for q in r.data['questions']]))  # tirage différent du premier
+        self.client.patch(f'/api/lms/exam-attempts/{a2_id}/answers/', {'answers': dict(list(good2.items())[:3])}, format='json')
         ExamAttempt.objects.filter(pk=a2_id).update(deadline=timezone.now() - timedelta(seconds=1))
         r = self.client.patch(f'/api/lms/exam-attempts/{a2_id}/answers/', {'answers': {}}, format='json')
         self.assertEqual(r.status_code, 409)
@@ -199,7 +200,7 @@ class LmsTests(APITestCase):
         d = self.client.get('/api/lms/admin/overview/').data
         self.assertEqual(d['courses'][0]['title'], 'Code de la route')
         self.assertEqual(len(d['courses'][0]['sections']), 10)
-        self.assertEqual(d['bank']['total'], 16)
+        self.assertEqual(d['bank']['total'], Question.objects.filter(in_exam_bank=True).count())
         r = self.client.post('/api/lms/admin/overview/', {'model': 'course', 'id': self.course.id, 'field': 'is_published', 'value': False}, format='json')
         self.assertEqual(r.status_code, 200)
         self.assertEqual(self.client.get('/api/lms/courses/').data['courses'], [])
@@ -231,17 +232,24 @@ class LmsEditorAndAnalyticsTests(APITestCase):
         themes = self.client.get('/api/lms/admin/themes/').data
         self.assertEqual([t['code'] for t in themes], list('LCRUDPMSEA'))
         self.assertEqual(sum(t['default_count'] for t in themes), 40)
-        self.assertEqual(themes[0]['bank'], 16)
+        self.assertEqual(themes[0]['bank'], Question.objects.filter(topic='L', in_exam_bank=True, is_published=True).count())
         exam = Exam.objects.get(is_demo=False)
         self.assertEqual((exam.question_count, exam.seconds_per_question, exam.distribution['L']), (40, 20, 10))
         self.assertEqual(exam.total_seconds, 40 * 20 + 30)
-        # tirage : seules des questions L existent → 16 ; on ajoute 3 questions « C » : la répartition en prend 3 au plus
-        for i in range(3):
-            q = Question.objects.create(kind='TRUE_FALSE', text_md=f'C{i}', topic='C', in_exam_bank=True)
-            q.choices.create(text='Vrai', is_correct=True); q.choices.create(text='Faux')
+        # tirage : 40 questions, réparties selon la répartition nationale (la banque couvre les 10 thèmes)
         drawn = exam.draw_questions()
-        self.assertEqual(len(drawn), 19)
-        self.assertEqual(sum(1 for q in drawn if q.topic == 'C'), 3)
+        self.assertEqual(len(drawn), 40)
+        by_topic = {}
+        for q in drawn:
+            by_topic[q.topic] = by_topic.get(q.topic, 0) + 1
+        self.assertEqual(by_topic, exam.distribution)
+
+        # thème appauvri : si la banque d'un thème est trop courte, le tirage complète avec les autres thèmes
+        Question.objects.filter(topic='A').update(in_exam_bank=False)
+        Question.objects.filter(topic='A', pk=Question.objects.filter(topic='A').first().pk).update(in_exam_bank=True)
+        drawn = exam.draw_questions()
+        self.assertEqual(len(drawn), 40)
+        self.assertEqual(sum(1 for q in drawn if q.topic == 'A'), 1)
 
     def test_editor_crud_course_section_lesson_quiz_question(self):
         self.auth('a@kaho.app')
@@ -272,7 +280,7 @@ class LmsEditorAndAnalyticsTests(APITestCase):
         self.assertEqual(len(r.data['choices']), 3)
         self.assertEqual(self.client.get(f"/api/lms/admin/questions/?quiz={sec['quiz']['id']}").data[0]['id'], qid)
         self.assertEqual(self.client.post(f'/api/lms/admin/questions/{qid}/duplicate/').status_code, 201)
-        self.assertEqual(self.client.get('/api/lms/admin/questions/?topic=L&bank=1').data.__len__(), 18)
+        self.assertEqual(self.client.get('/api/lms/admin/questions/?topic=L&bank=1').data.__len__(), Question.objects.filter(topic='L', in_exam_bank=True).count())
         # examen blanc créé depuis le back-office
         r = self.client.post('/api/lms/admin/exams/', {'title': 'Série courte', 'question_count': 5, 'seconds_per_question': 20, 'pass_score': 80, 'distribution': {'L': 5}}, format='json')
         self.assertEqual(r.status_code, 201, r.content)
@@ -313,7 +321,7 @@ class LmsEditorAndAnalyticsTests(APITestCase):
         self.assertEqual(stats['readiness'], 0)
         self.assertEqual(stats['readiness_count'], 1)
         self.assertEqual(stats['evolution'][0]['score'], 0)
-        self.assertEqual(stats['by_topic'][0]['code'], 'L')
+        self.assertIn('L', [t['code'] for t in stats['by_topic']])
         # relevé moniteur + validation ETG
         self.auth('m@kaho.app')
         d = self.client.get(f'/api/lms/admin/students/{self.student.id}/').data

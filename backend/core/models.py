@@ -358,10 +358,10 @@ class CancellationPolicy(models.Model):
 class Competency(models.Model):
     """Compétence du REMC (programme officiel)."""
     GROUPS = [
-        (1, 'Maîtriser le maniement du véhicule dans un trafic faible ou nul'),
+        (1, 'Maîtriser le véhicule dans un trafic faible ou nul'),
         (2, 'Appréhender la route et circuler dans des conditions normales'),
         (3, 'Circuler dans des conditions difficiles et partager la route'),
-        (4, 'Pratiquer une conduite autonome, sûre et économique'),
+        (4, 'Pratiquer une conduite autonome, sûre et éco-responsable'),
     ]
     code = models.CharField(max_length=10, unique=True)
     label = models.CharField(max_length=200)

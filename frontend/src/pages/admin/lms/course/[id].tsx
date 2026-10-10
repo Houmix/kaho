@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import api from '@/lib/api';
@@ -23,6 +23,25 @@ export default function AdminCourseEditor() {
     const ids = list.map((x) => x.id); const j = idx + dir; if (j < 0 || j >= ids.length) return;
     [ids[idx], ids[j]] = [ids[j], ids[idx]]; act(() => api.post(path, { ids }), 'Ordre mis à jour.');
   };
+
+  // Glisser-déposer : on déplace une section parmi les sections, ou une leçon dans sa section
+  const drag = useRef<{ kind: 'section' | 'lesson'; id: number; parent?: number } | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+  const dnd = (kind: 'section' | 'lesson', list: { id: number }[], idx: number, path: string, parent?: number) => ({
+    draggable: true,
+    onDragStart: (e: React.DragEvent) => { e.stopPropagation(); drag.current = { kind, id: list[idx].id, parent }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(list[idx].id)); },
+    onDragOver: (e: React.DragEvent) => { const d = drag.current; if (d && d.kind === kind && d.parent === parent) { e.preventDefault(); e.stopPropagation(); setOver(`${kind}-${list[idx].id}`); } },
+    onDragLeave: () => setOver(null),
+    onDragEnd: () => { drag.current = null; setOver(null); },
+    onDrop: (e: React.DragEvent) => {
+      const d = drag.current; drag.current = null; setOver(null);
+      if (!d || d.kind !== kind || d.parent !== parent || d.id === list[idx].id) return;
+      e.preventDefault(); e.stopPropagation();
+      const ids = list.map((x) => x.id).filter((x) => x !== d.id);
+      ids.splice(idx, 0, d.id);
+      act(() => api.post(path, { ids }), 'Ordre mis à jour.');
+    },
+  });
 
   if (!c) return <AdminShell title="Cours"><p className="text-brown-500">Chargement…</p></AdminShell>;
   const field = (k: keyof AdminCourse, label: string, textarea = false) => (
@@ -58,9 +77,10 @@ export default function AdminCourseEditor() {
         </section>
 
         <div className="space-y-4">
+          <p className="text-xs text-brown-800/50">Glissez-déposez une section ou une leçon pour changer son ordre (les flèches ▲▼ restent disponibles).</p>
           {c.sections.length === 0 && <p className="text-brown-800/60">Aucune section. Ajoutez les thèmes officiels depuis la page Contenus LMS ou créez une section.</p>}
           {c.sections.map((s: AdminSection, idx) => (
-            <section key={s.id} className="card">
+            <section key={s.id} className={`card ${over === `section-${s.id}` ? 'ring-2 ring-brown-500' : ''}`} {...dnd('section', c.sections, idx, '/lms/admin/sections/reorder/')}>
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 <div className="flex flex-col gap-0.5"><button onClick={() => move(c.sections, idx, -1, '/lms/admin/sections/reorder/')} disabled={idx === 0} className="text-xs text-brown-800/50 disabled:opacity-30">▲</button><button onClick={() => move(c.sections, idx, 1, '/lms/admin/sections/reorder/')} disabled={idx === c.sections.length - 1} className="text-xs text-brown-800/50 disabled:opacity-30">▼</button></div>
                 {s.code && <span className="badge bg-brown-700 text-cream-50">{s.code}</span>}
@@ -72,7 +92,7 @@ export default function AdminCourseEditor() {
               </div>
               <ul className="text-sm divide-y divide-cream-200">
                 {s.lessons.map((l, li) => (
-                  <li key={l.id} className="py-1.5 flex items-center gap-2">
+                  <li key={l.id} className={`py-1.5 flex items-center gap-2 cursor-grab ${over === `lesson-${l.id}` ? 'bg-cream-100' : ''}`} {...dnd('lesson', s.lessons, li, '/lms/admin/lessons/reorder/', s.id)}>
                     <div className="flex gap-1"><button onClick={() => move(s.lessons, li, -1, '/lms/admin/lessons/reorder/')} disabled={li === 0} className="text-[10px] text-brown-800/50 disabled:opacity-30">▲</button><button onClick={() => move(s.lessons, li, 1, '/lms/admin/lessons/reorder/')} disabled={li === s.lessons.length - 1} className="text-[10px] text-brown-800/50 disabled:opacity-30">▼</button></div>
                     <Link href={`/admin/lms/lesson/${l.id}`} className={`font-medium text-brown-700 hover:underline ${!l.is_published ? 'opacity-60' : ''}`}>{l.title}</Link>
                     {l.has_video && <span className="text-xs text-brown-800/50">▶ vidéo</span>}<span className="text-xs text-brown-800/50">{l.minutes} min</span>

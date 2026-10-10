@@ -160,11 +160,25 @@ class QuestionAdminSerializer(serializers.ModelSerializer):
     video_url = serializers.CharField(required=False, allow_blank=True, max_length=500)
     quiz_title = serializers.CharField(source='quiz.title', read_only=True, default=None)
     topic_label = serializers.SerializerMethodField()
+    answers_count = serializers.SerializerMethodField()
+    success_rate = serializers.SerializerMethodField()
 
     class Meta:
         from .models import Question
         model = Question
-        fields = ('id', 'quiz', 'quiz_title', 'kind', 'text_md', 'explanation_md', 'expected_answer', 'points', 'order', 'topic', 'topic_label', 'image_url', 'video_url', 'in_exam_bank', 'is_published', 'choices')
+        fields = ('id', 'quiz', 'quiz_title', 'kind', 'text_md', 'explanation_md', 'expected_answer', 'points', 'order', 'topic', 'topic_label', 'image_url', 'video_url', 'in_exam_bank', 'is_published', 'choices',
+                  'answers_count', 'success_rate')
+
+    def _stat(self, obj):
+        return (self.context.get('stats') or {}).get(obj.id)
+
+    def get_answers_count(self, obj):
+        st = self._stat(obj)
+        return st[0] if st else None
+
+    def get_success_rate(self, obj):
+        st = self._stat(obj)
+        return round(100 * st[1] / st[0]) if st and st[0] else None
 
     def get_topic_label(self, obj):
         from .models import theme_label
@@ -176,6 +190,8 @@ class QuestionAdminSerializer(serializers.ModelSerializer):
         if kind in ('SINGLE', 'MULTI', 'TRUE_FALSE') and choices is not None:
             if len(choices) < 2:
                 raise serializers.ValidationError({'choices': 'Au moins deux propositions.'})
+            if len(choices) > 4:
+                raise serializers.ValidationError({'choices': 'Quatre propositions au maximum.'})
             good = sum(1 for c in choices if c.get('is_correct'))
             if good == 0:
                 raise serializers.ValidationError({'choices': 'Cochez au moins une bonne réponse.'})

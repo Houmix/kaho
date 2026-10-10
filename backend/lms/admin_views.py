@@ -129,12 +129,64 @@ class AdminQuizViewSet(_Logged, viewsets.ModelViewSet):
         return Response(QuestionAdminSerializer(self.get_object().questions.all(), many=True).data)
 
 
+def question_success_stats(questions):
+    """{question_id: (réponses, bonnes réponses)} d'après les tentatives de quiz et d'examens blancs terminées."""
+    from .models import ExamAttempt, QuizAttempt
+    by_id = {q.id: q for q in questions}
+    stats = {qid: [0, 0] for qid in by_id}
+
+    def record(qid, answer):
+        q = by_id.get(qid)
+        if q is None:
+            return
+        ok, _ = q.grade_answer(answer)
+        stats[qid][0] += 1
+        stats[qid][1] += 1 if ok else 0
+
+    for a in QuizAttempt.objects.only('answers').iterator():
+        for k, v in (a.answers or {}).items():
+            if str(k).isdigit():
+                record(int(k), v)
+    for a in ExamAttempt.objects.exclude(status='IN_PROGRESS').only('question_ids', 'answers').iterator():
+        for qid in a.question_ids or []:
+            record(int(qid), (a.answers or {}).get(str(qid)))
+    return {qid: tuple(v) for qid, v in stats.items()}
+
+
 class AdminQuestionViewSet(_Logged, viewsets.ModelViewSet):
-    """Questions de quiz et banque d'examen. Filtres : ?quiz= ?topic= ?bank=1 ?q= ?unassigned=1"""
+    """Questions de quiz et banque d'examen.
+    Filtres : ?quiz= ?topic= ?bank=1 ?q= ?unassigned=1 ?max_success=50 (taux de réussite ≤ x %) ?min_success= ?unanswered=1"""
     serializer_class = QuestionAdminSerializer
     permission_classes = [IsSupervisorOrAdmin]
     pagination_class = None
     label = 'Question'
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        if self.action == 'list':
+            ctx['stats'] = getattr(self, '_stats', None)
+        return ctx
+
+    def list(self, request, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
+        p = request.query_params
+        wants_stats = any(p.get(k) for k in ('max_success', 'min_success', 'unanswered', 'with_stats'))
+        items = list(qs)
+        if wants_stats:
+            self._stats = question_success_stats(items)
+
+            def rate(q):
+                n, ok = self._stats.get(q.id, (0, 0))
+                return None if n == 0 else 100 * ok / n
+            if p.get('unanswered') == '1':
+                items = [q for q in items if rate(q) is None]
+            if p.get('max_success'):
+                items = [q for q in items if rate(q) is not None and rate(q) <= float(p['max_success'])]
+            if p.get('min_success'):
+                items = [q for q in items if rate(q) is not None and rate(q) >= float(p['min_success'])]
+            if p.get('sort') == 'success':
+                items.sort(key=lambda q: (rate(q) is None, rate(q) or 0))
+        return Response(self.get_serializer(items, many=True).data)
 
     def get_queryset(self):
         qs = Question.objects.select_related('quiz').prefetch_related('choices')

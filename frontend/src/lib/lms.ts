@@ -37,7 +37,7 @@ export interface StudentLmsReport extends ExamStats { history: ExamAttempt[]; qu
 
 export interface Theme { code: string; title: string; description: string; default_count: number; bank: number; label: string }
 export interface AdminChoice { id?: number; text: string; is_correct: boolean; order?: number }
-export interface AdminQuestion { id: number; quiz: number | null; quiz_title: string | null; kind: QuestionKind; text_md: string; explanation_md: string; expected_answer: string; points: number; order: number; topic: string; topic_label: string; image_url: string; video_url: string; in_exam_bank: boolean; is_published: boolean; choices: AdminChoice[] }
+export interface AdminQuestion { id: number; quiz: number | null; quiz_title: string | null; kind: QuestionKind; text_md: string; explanation_md: string; expected_answer: string; points: number; order: number; topic: string; topic_label: string; image_url: string; video_url: string; in_exam_bank: boolean; is_published: boolean; choices: AdminChoice[]; answers_count?: number | null; success_rate?: number | null }
 export interface AdminLessonRow { id: number; title: string; slug: string; order: number; is_published: boolean; has_video: boolean; minutes: number; completions: number }
 export interface AdminQuizRow { id: number; title: string; questions: number; is_published: boolean; attempts: number; pass_rate: number | null }
 export interface AdminSection { id: number; course: number; title: string; code: string; code_label: string; order: number; is_free_preview: boolean; unlock_threshold: number; lessons: AdminLessonRow[]; quiz: AdminQuizRow | null }

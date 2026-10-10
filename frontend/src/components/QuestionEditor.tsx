@@ -68,7 +68,7 @@ export default function QuestionEditor({ question, quizId, themes, onSaved, onCa
         <textarea required rows={3} value={f.text_md} onChange={(e) => set('text_md', e.target.value)} className="input-field font-mono text-sm" /></label>
       {withChoices ? (
         <div className="space-y-1.5">
-          <span className="text-xs text-brown-800/70">Propositions — cochez la ou les bonnes réponses{f.kind === 'MULTI' ? ' (plusieurs)' : ''}</span>
+          <span className="text-xs text-brown-800/70">Propositions (2 à 4) — cochez la ou les bonnes réponses{f.kind === 'MULTI' ? ' (plusieurs)' : ''}</span>
           {f.choices.map((c: AdminChoice, i: number) => (
             <div key={i} className="flex items-center gap-2">
               <input type={f.kind === 'MULTI' ? 'checkbox' : 'radio'} name="correct" checked={c.is_correct} onChange={(e) => setChoice(i, { is_correct: f.kind === 'MULTI' ? e.target.checked : true })} className="accent-brown-700" aria-label="Bonne réponse" />
@@ -76,7 +76,7 @@ export default function QuestionEditor({ question, quizId, themes, onSaved, onCa
               {f.kind !== 'TRUE_FALSE' && f.choices.length > 2 && <button type="button" onClick={() => set('choices', f.choices.filter((_: AdminChoice, j: number) => j !== i))} className="text-brown-800/50 hover:text-red-600" aria-label="Supprimer">✕</button>}
             </div>
           ))}
-          {f.kind !== 'TRUE_FALSE' && f.choices.length < 6 && <button type="button" onClick={() => set('choices', [...f.choices, { text: '', is_correct: false }])} className="text-sm text-brown-700 hover:underline">+ Ajouter une proposition</button>}
+          {f.kind !== 'TRUE_FALSE' && f.choices.length < 4 && <button type="button" onClick={() => set('choices', [...f.choices, { text: '', is_correct: false }])} className="text-sm text-brown-700 hover:underline">+ Ajouter une proposition</button>}
         </div>
       ) : (
         <label className="block"><span className="text-xs text-brown-800/70">{f.kind === 'CODE' ? 'Code attendu (espaces ignorés)' : 'Réponses acceptées, séparées par | (ex : octogone|un octogone)'}</span>
