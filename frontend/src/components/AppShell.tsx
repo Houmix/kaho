@@ -6,18 +6,19 @@ import { useAuth } from '@/hooks/useAuth';
 import AdminShell from './AdminShell';
 import Logo from './Logo';
 
+// `short` : libellé de la barre du bas sur téléphone (une seule ligne), `icon` : repère visuel
 const STUDENT_NAV = [
-  { href: '/student/dashboard', label: 'Mon espace' },
-  { href: '/student/reservation', label: 'Réserver' },
-  { href: '/code', label: 'Code' },
-  { href: '/student/notebook', label: 'Livret' },
-  { href: '/student/documents', label: 'Documents' },
-  { href: '/student/purchases', label: 'Offres' },
+  { href: '/student/dashboard', label: 'Mon espace', short: 'Accueil', icon: '⌂' },
+  { href: '/student/reservation', label: 'Réserver', short: 'Réserver', icon: '▤' },
+  { href: '/code', label: 'Code', short: 'Code', icon: '✎' },
+  { href: '/student/notebook', label: 'Livret', short: 'Livret', icon: '☰' },
+  { href: '/student/documents', label: 'Documents', short: 'Docs', icon: '▣' },
+  { href: '/student/purchases', label: 'Offres', short: 'Offres', icon: '◈' },
 ];
 const INSTRUCTOR_NAV = [
-  { href: '/instructor/dashboard', label: 'Tableau de bord' },
-  { href: '/instructor/planning', label: 'Planning' },
-  { href: '/instructor/availability', label: 'Disponibilités' },
+  { href: '/instructor/dashboard', label: 'Tableau de bord', short: 'Accueil', icon: '⌂' },
+  { href: '/instructor/planning', label: 'Planning', short: 'Planning', icon: '▤' },
+  { href: '/instructor/availability', label: 'Disponibilités', short: 'Dispos', icon: '◔' },
 ];
 export default function AppShell({ title, children }: { title: string; children: ReactNode }) {
   const { user, logout } = useAuth();
@@ -45,18 +46,22 @@ export default function AppShell({ title, children }: { title: string; children:
 
       <main className="container py-6 pb-24 sm:pb-10">
         {router.pathname !== home && (
-          <Link href={home} className="inline-flex items-center gap-1 text-sm text-brown-700 hover:underline mb-4">← Retour au tableau de bord</Link>
+          <Link href={home} className="inline-flex items-center gap-1 text-sm text-brown-700 hover:underline mb-4 py-2">← Retour au tableau de bord</Link>
         )}
         {children}
       </main>
 
-      <nav className="sm:hidden fixed bottom-0 inset-x-0 bg-white border-t border-cream-200 flex">
-        {nav.map((n) => (
-          <Link key={n.href} href={n.href}
-            className={`flex-1 text-center py-3 text-sm font-medium ${router.pathname === n.href ? 'text-brown-700 border-t-2 border-brown-700 -mt-px' : 'text-brown-800/60'}`}>
-            {n.label}
-          </Link>
-        ))}
+      <nav className="sm:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-cream-200 flex pb-[env(safe-area-inset-bottom)]" aria-label="Navigation principale">
+        {nav.map((n) => {
+          const active = router.pathname === n.href || (n.href === '/code' && router.pathname.startsWith('/code'));
+          return (
+            <Link key={n.href} href={n.href} aria-current={active ? 'page' : undefined}
+              className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-[11px] leading-tight font-medium whitespace-nowrap ${active ? 'text-brown-700 border-t-2 border-brown-700 -mt-px' : 'text-brown-800/60'}`}>
+              <span aria-hidden className="text-base leading-none">{n.icon}</span>
+              <span className="truncate max-w-full px-0.5">{n.short}</span>
+            </Link>
+          );
+        })}
       </nav>
     </>
   );

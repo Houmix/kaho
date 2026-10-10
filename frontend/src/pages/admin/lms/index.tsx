@@ -69,12 +69,12 @@ export default function AdminLms() {
     <AdminShell title="Contenus LMS" wide>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
         <h1 className="text-3xl">Contenus LMS</h1>
-        <div className="flex gap-2"><Link href="/admin/lms/bank" className="btn-secondary">Banque de questions</Link><Link href="/demo" target="_blank" className="btn-secondary">Démo publique ↗</Link></div>
+        <div className="flex flex-wrap gap-2"><Link href="/admin/lms/bank" className="btn-secondary">Banque de questions</Link><Link href="/demo" target="_blank" className="btn-secondary">Démo publique ↗</Link></div>
       </div>
       <p className="text-brown-800/70 mb-6">Cours, thèmes, leçons, quiz et examens blancs se créent et se modifient ici, sans outil externe.</p>
       {msg && <div className={`rounded-xl px-4 py-3 mb-4 text-sm ${msg.ok ? 'border border-brown-300 bg-brown-50' : 'border border-red-200 bg-red-50 text-red-700'}`}>{msg.text}</div>}
 
-      <div className="grid sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <div className="card py-4"><p className="text-sm text-brown-800/70">Apprenants avec accès</p><p className="text-3xl font-display">{learners?.with_access ?? '—'}</p></div>
         <div className="card py-4"><p className="text-sm text-brown-800/70">Actifs (30 j)</p><p className="text-3xl font-display">{learners?.active ?? '—'}</p></div>
         <div className="card py-4"><p className="text-sm text-brown-800/70">Banque d'examen</p><p className="text-3xl font-display">{bankTotal}</p><p className="text-xs text-brown-800/60">{themes.filter((t) => t.bank < t.default_count).length} thème(s) sous la répartition officielle</p></div>

@@ -208,7 +208,7 @@ export default function AdminStudentDetail() {
             </ul>
             <div className="border-t border-cream-200 pt-3 text-sm">
               <p className="text-brown-800/70 mb-2">Déposer une pièce pour l'élève (validée d'office) :</p>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <select value={uploadType} onChange={(e) => setUploadType(e.target.value)} className="input-field !py-1.5 text-xs">{DOC_TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
                 <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => upload(e.target.files?.[0])} className="text-xs" aria-label="Fichier" />
               </div>

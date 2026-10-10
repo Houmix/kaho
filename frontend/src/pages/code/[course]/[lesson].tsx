@@ -84,10 +84,10 @@ export default function LessonPage() {
               <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-cream-200 pt-6">
                 {canTrack && (lesson.completed ? <span className="badge bg-brown-700 text-cream-50">Leçon terminée ✓</span> : <button onClick={complete} disabled={busy} className="btn-primary">{busy ? '…' : 'Marquer comme terminée'}</button>)}
                 {lesson.quiz_id && <Link href={`/code/quiz/${lesson.quiz_id}`} className="btn-outline">Quiz de la leçon</Link>}
-                <div className="ml-auto flex gap-2">
-                  {lesson.prev && <Link href={`/code/${lesson.course_slug}/${lesson.prev.slug}`} className="btn-secondary">← {lesson.prev.title}</Link>}
-                  {sectionQuiz ? <Link href={`/code/quiz/${sectionQuiz}`} className="btn-primary">Passer le quiz →</Link>
-                    : lesson.next ? <Link href={`/code/${lesson.course_slug}/${lesson.next.slug}`} className="btn-secondary">{lesson.next.title} →</Link> : null}
+                <div className="sm:ml-auto flex flex-wrap gap-2 w-full sm:w-auto">
+                  {lesson.prev && <Link href={`/code/${lesson.course_slug}/${lesson.prev.slug}`} className="btn-secondary flex-1 sm:flex-none">← {lesson.prev.title}</Link>}
+                  {sectionQuiz ? <Link href={`/code/quiz/${sectionQuiz}`} className="btn-primary flex-1 sm:flex-none">Passer le quiz →</Link>
+                    : lesson.next ? <Link href={`/code/${lesson.course_slug}/${lesson.next.slug}`} className="btn-secondary flex-1 sm:flex-none">{lesson.next.title} →</Link> : null}
                 </div>
               </div>
               {sectionQuiz && (

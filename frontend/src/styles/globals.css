@@ -5,9 +5,20 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
   body {
     @apply bg-cream-50 text-brown-900 font-sans antialiased;
+    /* Filet de sécurité mobile : jamais de défilement horizontal de la page (les tableaux défilent dans leur carte) */
+    overflow-x: hidden;
+  }
+  /* Éléments de grille / flex : peuvent rétrécir sous leur contenu (sinon un long texte élargit toute la page) */
+  main, main > *, .card { min-width: 0; }
+  img, video, iframe, svg { max-width: 100%; }
+  input[type="file"] { max-width: 100%; }
+  /* iOS zoome sur les champs < 16 px : on évite le zoom automatique au focus */
+  @media (max-width: 639px) {
+    input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
   }
   h1, h2, h3, h4 {
     @apply font-display;
@@ -19,7 +30,7 @@
     @apply max-w-screen-xl mx-auto px-4;
   }
   .btn {
-    @apply inline-flex items-center justify-center px-5 py-2.5 rounded-full font-medium whitespace-nowrap transition-colors;
+    @apply inline-flex items-center justify-center px-5 py-2.5 rounded-full font-medium text-center transition-colors sm:whitespace-nowrap max-w-full;
   }
   .btn-primary {
     @apply btn bg-brown-700 text-cream-50 hover:bg-brown-800;
@@ -31,8 +42,11 @@
     @apply btn border border-brown-700 text-brown-700 hover:bg-brown-50;
   }
   .card {
-    @apply bg-white rounded-2xl border border-cream-200 shadow-warm p-6;
+    @apply bg-white rounded-2xl border border-cream-200 shadow-warm p-4 sm:p-6;
   }
+  /* Tableaux : défilement horizontal dans la carte plutôt que de déborder de l'écran */
+  .card table, main table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .card > table, main table.w-full { width: 100%; }
   .input-field {
     @apply w-full px-4 py-2.5 bg-white border border-cream-300 rounded-xl text-brown-900 placeholder:text-brown-300 focus:outline-none focus:ring-2 focus:ring-brown-500 focus:border-brown-500;
   }

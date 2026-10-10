@@ -73,7 +73,7 @@ export default function AdminSales() {
 
       {tab === 'overview' && (!sales ? <p className="text-brown-500">Chargement…</p> : (
         <>
-          <div className="grid sm:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
             <div className="card py-4"><p className="text-sm text-brown-800/70">Encaissé cette année</p><p className="text-3xl font-display">{formatPrice(sales.year_revenue)}</p></div>
             <div className="card py-4"><p className="text-sm text-brown-800/70">Ce mois</p><p className="text-3xl font-display">{formatPrice(sales.months[sales.months.length - 1].revenue)}</p><p className="text-xs text-brown-800/60">{sales.months[sales.months.length - 1].sales} vente(s)</p></div>
             <div className={`card py-4 ${sales.unpaid.count ? 'border-caramel bg-brown-50' : ''}`}><p className="text-sm text-brown-800/70">Impayés</p><p className="text-3xl font-display">{formatPrice(sales.unpaid.amount)}</p><p className="text-xs text-brown-800/60">{sales.unpaid.count} facture(s){sales.unpaid.overdue ? ` · ${sales.unpaid.overdue} en retard` : ''}</p></div>

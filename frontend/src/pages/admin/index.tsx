@@ -53,7 +53,7 @@ export default function AdminHome() {
         </section>
       )}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
         {isOwner && <Kpi label={`Chiffre d'affaires — ${d.month.label}`} value={formatPrice(d.month.revenue)} sub={`${d.month.sales} vente${d.month.sales > 1 ? 's' : ''} encaissée${d.month.sales > 1 ? 's' : ''}`} href="/admin/sales" />}
         <Kpi label="Élèves actifs" value={String(d.students.active)} sub={`sur ${d.students.total} inscrits`} href="/admin/students" />
         <Kpi label="Taux d'occupation (semaine)" value={d.occupancy.percent === null ? '—' : `${d.occupancy.percent} %`} sub={`${d.occupancy.booked_hours} h réservées / ${d.occupancy.opened_hours} h ouvertes`} href="/admin/calendar" />
@@ -65,7 +65,7 @@ export default function AdminHome() {
       </div>
 
       <h2 className="text-xl mb-3">Actions rapides</h2>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {QUICK.filter((q) => !q.owner || isOwner).map((q) => (
           <Link key={q.href} href={q.href} className="card py-4 hover:border-brown-300 transition-colors">
             <div className="font-semibold">{q.label} →</div>

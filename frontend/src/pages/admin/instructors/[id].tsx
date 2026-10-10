@@ -67,7 +67,7 @@ export default function AdminInstructorDetail() {
       </div>
       {msg && <div className={`rounded-xl px-4 py-3 mb-6 text-sm ${msg.ok ? 'border border-brown-300 bg-brown-50' : 'border border-red-200 bg-red-50 text-red-700'}`}>{msg.text}</div>}
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <div className="card py-4"><p className="text-sm text-brown-800/70">Leçons à venir</p><p className="text-3xl font-display">{i.stats.upcoming}</p></div>
         <div className="card py-4"><p className="text-sm text-brown-800/70">Leçons données</p><p className="text-3xl font-display">{i.stats.lessons}</p></div>
         <div className="card py-4"><p className="text-sm text-brown-800/70">Élèves</p><p className="text-3xl font-display">{i.stats.students}</p></div>

@@ -65,7 +65,7 @@ export default function Purchases() {
       <p className="text-brown-800/70 mb-6">Choisissez une formule ou rechargez des heures : votre moniteur valide le paiement et vos accès sont crédités.</p>
 
       {profile && (
-        <div className="grid sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
           <div className="card py-4"><p className="text-sm text-brown-800/70">Heures restantes</p><p className="text-3xl font-display">{profile.remaining_hours.toFixed(1)} h</p></div>
           <div className="card py-4">
             <p className="text-sm text-brown-800/70">Cours de code en ligne</p>

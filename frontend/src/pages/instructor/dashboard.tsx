@@ -50,7 +50,7 @@ export default function InstructorHome() {
         </section>
       )}
 
-      <div className="grid sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
         <div className="card py-4"><p className="text-sm text-brown-800/70">Aujourd'hui</p><p className="text-3xl font-display">{data.today.length} <span className="text-base font-sans">leçon{data.today.length > 1 ? 's' : ''}</span></p></div>
         <div className="card py-4"><p className="text-sm text-brown-800/70">Avis élèves</p><p className="text-3xl font-display">{data.rating.average !== null ? `${data.rating.average.toFixed(1)}/5` : '—'}</p><p className="text-xs text-brown-800/60">{data.rating.count} avis</p></div>
         <div className="card py-4"><p className="text-sm text-brown-800/70">Heures effectuées — {month}</p><p className="text-3xl font-display">{data.month.hours} h</p></div>

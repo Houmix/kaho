@@ -68,7 +68,7 @@ export default function InstructorStudentSheet() {
         </form>
       )}
 
-      <div className="grid sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         <div className="card py-4"><p className="text-sm text-brown-800/70">Heures effectuées</p><p className="text-3xl font-display">{s.used_hours.toFixed(1)} h</p><p className="text-xs text-brown-800/60">sur {s.purchased_hours.toFixed(1)} h achetées</p></div>
         <div className="card py-4"><p className="text-sm text-brown-800/70">Heures restantes</p><p className={`text-3xl font-display ${s.remaining_hours <= 1 ? 'text-red-700' : ''}`}>{s.remaining_hours.toFixed(1)} h</p><p className="text-xs text-brown-800/60">{s.reserved_hours.toFixed(1)} h réservées</p></div>
         <div className="card py-4"><p className="text-sm text-brown-800/70">Livret</p><ProgressGauge progress={lb.progress} compact /></div>

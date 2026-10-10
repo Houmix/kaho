@@ -38,6 +38,8 @@ export default function PlanningView() {
   const { user } = useAuth();
   const isBackoffice = user?.role === 'SUPERVISOR' || user?.role === 'ADMIN' || user?.role === 'OWNER';
   const [view, setView] = useState<View>('week');
+  // Sur téléphone, la vue « jour » est la seule lisible sans défilement horizontal
+  useEffect(() => { if (window.innerWidth < 640) setView('day'); }, []);
   const [anchor, setAnchor] = useState(() => new Date());
   const [data, setData] = useState<CalendarData | null>(null);
   const [instructor, setInstructor] = useState('');
@@ -82,6 +84,28 @@ export default function PlanningView() {
   const refund = (s: Slot) => { const note = prompt('Justificatif de la dérogation (ex : certificat médical du …) :'); if (note) run(() => api.post(`/slots/${s.id}/refund/`, { note }), 'Dérogation enregistrée.'); };
   const opensAt = (s: Slot) => new Date(s.assessment_opens_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
+  const statusFor = (s: Slot) => (
+    <>
+      <span className={`badge ${statusCls[s.status]}`}>{s.status_display}</span>
+      {s.hours_refunded && <span className="badge bg-cream-200 text-brown-800 ml-1" title={s.refund_note}>re-crédité</span>}
+      {Number(s.cancellation_fee) > 0 && <span className="badge bg-caramel/40 text-brown-900 ml-1">frais {Number(s.cancellation_fee).toFixed(0)} €</span>}
+      {s.cancel_reason && <div className="text-xs text-brown-800/60 mt-1 max-w-[16rem] truncate" title={s.cancel_reason}>Motif : {s.cancel_reason}</div>}
+    </>
+  );
+  const actionsFor = (s: Slot) => (
+    <>
+      {s.status === 'BOOKED' && s.is_past && !s.has_lesson && <>
+        {s.can_assess
+          ? <Link href={`/instructor/lesson/${s.id}?from=planning`} className="text-brown-700 font-medium hover:underline">Bilan</Link>
+          : <span className="text-brown-800/50" title="Le bilan s'ouvre dans les 10 dernières minutes de la leçon">🔒 Bilan dès {opensAt(s)}</span>}
+        <button onClick={() => noShow(s)} className="text-red-700 hover:underline">Absent</button>
+      </>}
+      {s.has_lesson && <Link href={`/instructor/lesson/${s.id}?from=planning`} className="text-brown-700 hover:underline">Voir le bilan</Link>}
+      {s.status === 'BOOKED' && !s.is_past && <button onClick={() => cancel(s)} className="text-brown-800/60 hover:underline">Annuler</button>}
+      {isBackoffice && ((s.hours_debited && !s.hours_refunded) || Number(s.cancellation_fee) > 0) && <button onClick={() => refund(s)} className="text-brown-700 hover:underline">Re-créditer</button>}
+    </>
+  );
+
   const shift = (n: number) => setAnchor((a) => view === 'day' ? addDays(a, n) : view === 'week' ? addDays(a, 7 * n) : new Date(a.getFullYear(), a.getMonth() + n, 1));
   const title = view === 'day' ? frDate(iso(anchor), { weekday: 'long', day: 'numeric', month: 'long' })
     : view === 'week' ? `Semaine du ${frDate(iso(startOfWeek(anchor)), { day: 'numeric', month: 'long' })}`
@@ -97,11 +121,11 @@ export default function PlanningView() {
     <AppShell title="Planning">
       {isBackoffice && <BackLink fallbackHref="/admin" fallbackLabel="← Retour au tableau de bord" />}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => shift(-1)} className="btn-secondary !px-3 !py-1.5" aria-label="Précédent">←</button>
           <button onClick={() => setAnchor(new Date())} className="btn-secondary !py-1.5 text-sm">Aujourd'hui</button>
           <button onClick={() => shift(1)} className="btn-secondary !px-3 !py-1.5" aria-label="Suivant">→</button>
-          <h1 className="text-2xl ml-2 capitalize">{title}</h1>
+          <h1 className="text-xl sm:text-2xl sm:ml-2 capitalize w-full sm:w-auto order-last sm:order-none">{title}</h1>
         </div>
         <div className="flex gap-1">
           {(['day', 'week', 'month'] as View[]).map((v) => <button key={v} onClick={() => setView(v)} className={`badge !px-4 !py-2 ${view === v ? 'bg-brown-700 text-cream-50' : 'bg-cream-100 text-brown-800'}`}>{v === 'day' ? 'Jour' : v === 'week' ? 'Semaine' : 'Mois'}</button>)}
@@ -154,7 +178,25 @@ export default function PlanningView() {
 
       <section className="mt-8">
         <h2 className="text-xl mb-3">Leçons de la période <span className="text-sm text-brown-800/60 font-normal">({listed.length})</span></h2>
-        <div className="card p-0 overflow-x-auto">
+        {/* Téléphone : une carte par leçon */}
+        <div className="sm:hidden space-y-2">
+          {!data ? <p className="text-brown-800/60">Chargement…</p> : listed.length === 0 ? <p className="text-brown-800/60">Aucun créneau sur cette période</p> : listed.map((s) => (
+            <article key={s.id} className="card !p-4 text-sm space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-semibold">{frDate(s.date, { weekday: 'short', day: 'numeric', month: 'short' })} · {hm(s.start_time)}–{hm(s.end_time)}</p>
+                  <p className="text-brown-800/70">{s.meeting_point_name}{isBackoffice && ` · ${s.instructor_name}`}</p>
+                </div>
+                <div className="text-right">{statusFor(s)}</div>
+              </div>
+              {s.student && s.student_name && (
+                <Link href={studentHref(s.student)} className="inline-block font-medium text-brown-700 underline underline-offset-2 py-1">{s.student_name} →</Link>
+              )}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 border-t border-cream-200 [&_a]:py-1.5 [&_button]:py-1.5">{actionsFor(s)}</div>
+            </article>
+          ))}
+        </div>
+        <div className="card p-0 overflow-x-auto hidden sm:block">
           <table className="w-full text-sm">
             <thead className="bg-cream-100 text-brown-800/70">
               <tr>
@@ -181,23 +223,8 @@ export default function PlanningView() {
                       ? <Link href={studentHref(s.student)} className="font-medium text-brown-700 hover:underline" title="Ouvrir la fiche élève">{s.student_name}</Link>
                       : '—'}
                   </td>
-                  <td className="py-3 px-4">
-                    <span className={`badge ${statusCls[s.status]}`}>{s.status_display}</span>
-                    {s.hours_refunded && <span className="badge bg-cream-200 text-brown-800 ml-1" title={s.refund_note}>re-crédité</span>}
-                    {Number(s.cancellation_fee) > 0 && <span className="badge bg-caramel/40 text-brown-900 ml-1">frais {Number(s.cancellation_fee).toFixed(0)} €</span>}
-                    {s.cancel_reason && <div className="text-xs text-brown-800/60 mt-1 max-w-[16rem] truncate" title={s.cancel_reason}>Motif : {s.cancel_reason}</div>}
-                  </td>
-                  <td className="py-3 px-4 whitespace-nowrap space-x-2">
-                    {s.status === 'BOOKED' && s.is_past && !s.has_lesson && <>
-                      {s.can_assess
-                        ? <Link href={`/instructor/lesson/${s.id}?from=planning`} className="text-brown-700 font-medium hover:underline">Bilan</Link>
-                        : <span className="text-brown-800/50" title="Le bilan s'ouvre dans les 10 dernières minutes de la leçon">🔒 Bilan dès {opensAt(s)}</span>}
-                      <button onClick={() => noShow(s)} className="text-red-700 hover:underline">Absent</button>
-                    </>}
-                    {s.has_lesson && <Link href={`/instructor/lesson/${s.id}?from=planning`} className="text-brown-700 hover:underline">Voir le bilan</Link>}
-                    {s.status === 'BOOKED' && !s.is_past && <button onClick={() => cancel(s)} className="text-brown-800/60 hover:underline">Annuler</button>}
-                    {isBackoffice && ((s.hours_debited && !s.hours_refunded) || Number(s.cancellation_fee) > 0) && <button onClick={() => refund(s)} className="text-brown-700 hover:underline">Re-créditer</button>}
-                  </td>
+                  <td className="py-3 px-4">{statusFor(s)}</td>
+                  <td className="py-3 px-4 whitespace-nowrap space-x-2">{actionsFor(s)}</td>
                 </tr>
               ))}
             </tbody>
